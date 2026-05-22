@@ -39,7 +39,8 @@ Walkthrough.Json
 ├── JsonWorkflowRunner             — pure engine: step execution, path resolution, assertion evaluation
 ├── JsonWorkflowTestBase           — thin xUnit wrapper over the runner
 ├── WorkflowDefinition             — all JSON model types
-├── WorkflowResult / StepResult    — execution results
+├── WorkflowResult                 — WorkflowName, Passed, Steps, AssertionErrors, Captures; ThrowIfFailed()
+└── StepResult                     — StepName, Request (resolved payload; null for build steps), Response
 └── JsonValueResolver              — FromJsonValue, JsonElementToObject, field value types
 ```
 
