@@ -60,23 +60,23 @@ public class WorkflowContextTests
     }
 
     [Fact]
-    public void HasCapture_ReturnsFalse_WhenStepNotExecuted()
+    public void GetOrDefault_ReturnsNull_WhenStepNotExecuted()
     {
         var context = new WorkflowContext();
-        Assert.False(context.HasCapture("login"));
+        Assert.Null(context.GetOrDefault<FakeResponse>("login"));
     }
 
     [Fact]
-    public async Task HasCapture_ReturnsTrue_AfterStepExecutes()
+    public async Task GetOrDefault_ReturnsValue_AfterStepExecutes()
     {
         var context = new WorkflowContext();
         var runner  = new WorkflowRunner(context, _ => new FakeTarget());
         await runner.ExecuteAsync(new FakeRequest());
-        Assert.True(context.HasCapture("login"));
+        Assert.NotNull(context.GetOrDefault<FakeResponse>("login"));
     }
 }
 
-public class HasCaptureInFromLambdaTests
+public class GetOrDefaultInFromLambdaTests
 {
     private record TokenResponse(string Token);
     private record LoginRequest() : WorkflowRequest<TokenResponse, LoginRequest>, IWorkflowRequest
@@ -88,8 +88,8 @@ public class HasCaptureInFromLambdaTests
     {
         public static string StepName => "api";
         public IFieldValue<string> Authorization { get; init; } =
-            From(ctx => ctx.HasCapture("login")
-                ? $"Bearer {ctx.Get<TokenResponse>("login").Token}"
+            From(ctx => ctx.GetOrDefault<TokenResponse>("login") is { } login
+                ? $"Bearer {login.Token}"
                 : "");
     }
 
@@ -101,7 +101,7 @@ public class HasCaptureInFromLambdaTests
     }
 
     [Fact]
-    public void HasCapture_False_FromLambdaReturnsFallback()
+    public void GetOrDefault_Null_FromLambdaReturnsFallback()
     {
         var context  = new WorkflowContext();
         var resolved = FieldValueResolver.Resolve(new ApiRequest(), context);
@@ -109,7 +109,7 @@ public class HasCaptureInFromLambdaTests
     }
 
     [Fact]
-    public async Task HasCapture_True_FromLambdaReturnsValue()
+    public async Task GetOrDefault_NotNull_FromLambdaReturnsValue()
     {
         var context = new WorkflowContext();
         var runner  = new WorkflowRunner(context, _ => new FakeLogin("tok-abc"));

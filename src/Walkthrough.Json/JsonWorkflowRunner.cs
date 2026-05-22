@@ -264,7 +264,7 @@ public class JsonWorkflowRunner
             };
 
             captures[fullResponseKey] = fullResponse;
-            return new StepResult(fullResponseKey, fullResponse);
+            return new StepResult(fullResponseKey, bodyFields, fullResponse);
         }
 
         var responseJson = await HttpExecutor.SendAsync(
@@ -280,7 +280,7 @@ public class JsonWorkflowRunner
         var captureName = invocation.CaptureAs ?? stepName;
         captures[captureName] = captured;
 
-        return new StepResult(captureName, captured);
+        return new StepResult(captureName, bodyFields, captured);
     }
 
     private static StepResult BuildItem(
@@ -310,7 +310,7 @@ public class JsonWorkflowRunner
         var captureName = invocation.CaptureAs ?? buildName;
         captures[captureName] = resolvedFields;
 
-        return new StepResult(captureName, resolvedFields);
+        return new StepResult(captureName, null, resolvedFields);
     }
 
     private static async Task<StepResult> PollStepAsync(

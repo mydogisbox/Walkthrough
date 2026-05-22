@@ -398,4 +398,28 @@ After this step, `deleteResult.status` is the HTTP status code and `deleteResult
 - `captureRequestAs` is additive — it doesn't replace the response capture; both are available.
 - `captureFullResponseAs` replaces the normal response capture for that invocation — the step name is not populated.
 - Build steps always write to the `accumulateAs` list regardless of `captureAs`.
+
+---
+
+## WorkflowResult and StepResult
+
+`JsonWorkflowRunner.RunAsync` returns a `WorkflowResult`:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `WorkflowName` | `string` | Name of the workflow that ran |
+| `Passed` | `bool` | `true` if all assertions passed |
+| `Steps` | `List<StepResult>` | One entry per executed step, in order |
+| `AssertionErrors` | `List<string>` | Failure messages when `Passed` is `false` |
+| `Captures` | `Dictionary<string, object?>` | All captured values at end of workflow |
+
+Each `StepResult` entry:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `StepName` | `string` | Capture key for this step (step name or `captureAs`) |
+| `Request` | `object?` | Resolved request payload sent (`Dictionary<string, object?>`); `null` for build steps |
+| `Response` | `object?` | Deserialized response; `Dictionary<string, object?>` for full-response captures |
+
+`WorkflowResult.ThrowIfFailed()` throws a `JsonWorkflowException` with all assertion errors formatted if `Passed` is `false`.
 - Without `captureAs`, repeated builds of the same step overwrite the individual result capture; the accumulation still grows.

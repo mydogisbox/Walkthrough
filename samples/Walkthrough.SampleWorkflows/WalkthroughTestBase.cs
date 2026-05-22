@@ -26,9 +26,7 @@ public abstract class WalkthroughTestBase
             .Register<EchoHeadersWithStepHeaderStep>()
             .WithHeaders(new Dictionary<string, IFieldValue<string>>
             {
-                ["Authorization"] = From(ctx => ctx.HasCapture("login")
-                    ? $"Bearer {ctx.Get<LoginResponse>("login").Token}"
-                    : "")
+                ["Authorization"] = From(ctx => $"Bearer {ctx.GetOrDefault<LoginResponse>("login")?.Token ?? ""}")
             });
 
         _runner = new WorkflowRunner(context, loginTarget, apiTarget);

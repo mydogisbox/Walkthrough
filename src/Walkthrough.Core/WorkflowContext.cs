@@ -57,9 +57,14 @@ public class WorkflowContext
     }
 
     /// <summary>
-    /// Returns true if a response has been captured for the given step name.
+    /// Returns the captured response for the given step name, or null if the step has not run.
     /// </summary>
-    public bool HasCapture(string stepName) => _captures.ContainsKey(stepName);
+    public T? GetOrDefault<T>(string stepName) where T : class
+    {
+        if (_captures.TryGetValue(stepName, out var value) && value is T typed)
+            return typed;
+        return null;
+    }
 
     /// <summary>
     /// Returns the raw captured object for a step without type casting.

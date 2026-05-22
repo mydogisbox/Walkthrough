@@ -23,4 +23,4 @@ public record WorkflowResult(
 /// <summary>
 /// The result of a single step execution.
 /// </summary>
-public record StepResult(string StepName, object? Response);
+public record StepResult(string StepName, object? Request, object? Response);

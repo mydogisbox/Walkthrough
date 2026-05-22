@@ -13,9 +13,9 @@
       <PackagePath>build/Walkthrough.Core.targets</PackagePath>
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\CLAUDE.md">
+    <Content Include="..\..\docs\claude\claude.md">
       <Pack>true</Pack>
-      <PackagePath>build/claude/CLAUDE.md</PackagePath>
+      <PackagePath>build/claude/claude.md</PackagePath>
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Content>
     <Content Include="..\..\docs\claude\csharp-style.md">
@@ -31,6 +31,11 @@
     <Content Include="..\..\docs\claude\upgrade-0.3-to-0.4.md">
       <Pack>true</Pack>
       <PackagePath>build/claude/upgrade-0.3-to-0.4.md</PackagePath>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\docs\claude\upgrade-0.4-to-0.5.md">
+      <Pack>true</Pack>
+      <PackagePath>build/claude/upgrade-0.4-to-0.5.md</PackagePath>
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

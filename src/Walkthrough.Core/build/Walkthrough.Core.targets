@@ -3,13 +3,26 @@
     <PropertyGroup>
       <_WalkthroughDocsSrc>$(MSBuildThisFileDirectory)claude/</_WalkthroughDocsSrc>
       <_WalkthroughDocsDest>$(MSBuildProjectDirectory)/.claude/walkthrough/</_WalkthroughDocsDest>
+      <_WalkthroughVersionFile>$(_WalkthroughDocsDest).version</_WalkthroughVersionFile>
     </PropertyGroup>
-    <MakeDir Directories="$(_WalkthroughDocsDest)" />
+
+    <ReadLinesFromFile File="$(_WalkthroughVersionFile)" Condition="Exists('$(_WalkthroughVersionFile)')">
+      <Output TaskParameter="Lines" ItemName="_WalkthroughInstalledVersionLines" />
+    </ReadLinesFromFile>
+    <PropertyGroup>
+      <_WalkthroughInstalledVersion>@(_WalkthroughInstalledVersionLines)</_WalkthroughInstalledVersion>
+      <_WalkthroughUpToDate Condition="'$(_WalkthroughInstalledVersion)' == '$(MSBuildThisFileDirectory)'">true</_WalkthroughUpToDate>
+      <_WalkthroughUpToDate Condition="'$(_WalkthroughUpToDate)' == ''">false</_WalkthroughUpToDate>
+    </PropertyGroup>
+
+    <MakeDir Directories="$(_WalkthroughDocsDest)" Condition="!$(_WalkthroughUpToDate)" />
     <ItemGroup>
-      <_WalkthroughDocFiles Include="$(_WalkthroughDocsSrc)**/*" />
+      <_WalkthroughDocFiles Include="$(_WalkthroughDocsSrc)**/*" Condition="!$(_WalkthroughUpToDate)" />
     </ItemGroup>
     <Copy SourceFiles="@(_WalkthroughDocFiles)"
-          DestinationFolder="$(_WalkthroughDocsDest)%(RecursiveDir)" />
-    <Message Text="Walkthrough: Claude docs written to .claude/walkthrough/ — add @import entries to your CLAUDE.md to enable them." Importance="high" />
+          DestinationFolder="$(_WalkthroughDocsDest)%(RecursiveDir)"
+          Condition="!$(_WalkthroughUpToDate)" />
+    <WriteLinesToFile File="$(_WalkthroughVersionFile)" Lines="$(MSBuildThisFileDirectory)" Overwrite="true" Condition="!$(_WalkthroughUpToDate)" />
+    <Message Text="Walkthrough: Claude docs written to .claude/walkthrough/ — add '@import .claude/walkthrough/claude.md' to your CLAUDE.md to enable them." Importance="high" Condition="!$(_WalkthroughUpToDate)" />
   </Target>
 </Project>

@@ -1,6 +1,6 @@
 # C# style
 
-_Current version: 0.4.4. Upgrading from 0.3.0? See [upgrade-0.3-to-0.4.md](upgrade-0.3-to-0.4.md)._
+_Current version: 0.5.0. Upgrading from 0.4.0? See [upgrade-0.4-to-0.5.md](upgrade-0.4-to-0.5.md). Upgrading from 0.3.0? See [upgrade-0.3-to-0.4.md](upgrade-0.3-to-0.4.md)._
 
 ---
 
@@ -22,12 +22,10 @@ public IFieldValue<string> BaseUrl { get; init; } = Static("http://localhost:502
 
 `Generated` accepts any `Func<T>` — there is no built-in generator list in C#. That constraint only applies to the JSON `{ "generated": "guid" }` syntax.
 
-`HasCapture` checks whether a step has run before reading its response — useful in `From` lambdas where a prior step is optional:
+`GetOrDefault` returns the captured response or `null` if the step hasn't run — useful in `From` lambdas where a prior step is optional:
 
 ```csharp
-["Authorization"] = From(ctx => ctx.HasCapture("login")
-    ? $"Bearer {ctx.Get<LoginResponse>("login").Token}"
-    : "")
+["Authorization"] = From(ctx => $"Bearer {ctx.GetOrDefault<LoginResponse>("login")?.Token ?? ""}")
 ```
 
 ---
