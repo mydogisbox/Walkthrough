@@ -8,34 +8,34 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="build\Walkthrough.Core.targets">
+    <Content Include="build\Walkthrough.Core.targets" Visible="false">
       <Pack>true</Pack>
-      <PackagePath>build/Walkthrough.Core.targets</PackagePath>
+      <PackagePath>buildTransitive/Walkthrough.Core.targets</PackagePath>
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Content>
     <Content Include="..\..\docs\claude\claude.md">
       <Pack>true</Pack>
-      <PackagePath>build/claude/claude.md</PackagePath>
+      <PackagePath>buildTransitive/claude/claude.md</PackagePath>
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Content>
     <Content Include="..\..\docs\claude\csharp-style.md">
       <Pack>true</Pack>
-      <PackagePath>build/claude/csharp-style.md</PackagePath>
+      <PackagePath>buildTransitive/claude/csharp-style.md</PackagePath>
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Content>
     <Content Include="..\..\docs\claude\json-style.md">
       <Pack>true</Pack>
-      <PackagePath>build/claude/json-style.md</PackagePath>
+      <PackagePath>buildTransitive/claude/json-style.md</PackagePath>
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Content>
     <Content Include="..\..\docs\claude\upgrade-0.3-to-0.4.md">
       <Pack>true</Pack>
-      <PackagePath>build/claude/upgrade-0.3-to-0.4.md</PackagePath>
+      <PackagePath>buildTransitive/claude/upgrade-0.3-to-0.4.md</PackagePath>
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Content>
     <Content Include="..\..\docs\claude\upgrade-0.4-to-0.5.md">
       <Pack>true</Pack>
-      <PackagePath>build/claude/upgrade-0.4-to-0.5.md</PackagePath>
+      <PackagePath>buildTransitive/claude/upgrade-0.4-to-0.5.md</PackagePath>
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

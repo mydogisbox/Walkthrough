@@ -1,5 +1,5 @@
 <Project>
-  <Target Name="CopyWalkthroughClaudeDocs" BeforeTargets="Build">
+  <Target Name="CopyWalkthroughClaudeDocs" BeforeTargets="BeforeBuild;BeforeRebuild;PrepareForBuild">
     <PropertyGroup>
       <_WalkthroughDocsSrc>$(MSBuildThisFileDirectory)claude/</_WalkthroughDocsSrc>
       <_WalkthroughDocsDest>$(MSBuildProjectDirectory)/.claude/walkthrough/</_WalkthroughDocsDest>

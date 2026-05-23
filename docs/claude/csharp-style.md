@@ -1,6 +1,6 @@
 # C# style
 
-_Current version: 0.5.2. Upgrading from 0.4.0? See [upgrade-0.4-to-0.5.md](upgrade-0.4-to-0.5.md). Upgrading from 0.3.0? See [upgrade-0.3-to-0.4.md](upgrade-0.3-to-0.4.md)._
+_Current version: 0.5.3. Upgrading from 0.4.0? See [upgrade-0.4-to-0.5.md](upgrade-0.4-to-0.5.md). Upgrading from 0.3.0? See [upgrade-0.3-to-0.4.md](upgrade-0.3-to-0.4.md)._
 
 ---
 
