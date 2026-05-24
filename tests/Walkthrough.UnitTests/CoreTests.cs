@@ -34,13 +34,12 @@ public class FieldValueTests
 public class WorkflowContextTests
 {
     private record FakeResponse();
-    private record FakeRequest() : WorkflowRequest<FakeResponse, FakeRequest>, IWorkflowRequest
+    private record FakeRequest() : WorkflowRequest<FakeResponse>
     {
-        public static string StepName => "login";
     }
     private class FakeTarget : ITarget
     {
-        public bool CanHandle(Type _) => true;
+        public bool CanHandle(string _) => true;
         public Task<TResponse> ExecuteAsync<TResponse>(WorkflowRequest<TResponse> request, Dictionary<string, object?> resolvedFields, WorkflowContext context)
             => Task.FromResult((TResponse)(object)new FakeResponse());
     }
@@ -56,14 +55,14 @@ public class WorkflowContextTests
             () => context.Get<object>("missingStep"));
 
         Assert.Contains("missingStep", ex.Message);
-        Assert.Contains("login", ex.Message);
+        Assert.Contains("FakeRequest", ex.Message);
     }
 
     [Fact]
     public void GetOrDefault_ReturnsNull_WhenStepNotExecuted()
     {
         var context = new WorkflowContext();
-        Assert.Null(context.GetOrDefault<FakeResponse>("login"));
+        Assert.Null(context.GetOrDefault<FakeResponse>("FakeRequest"));
     }
 
     [Fact]
@@ -72,30 +71,28 @@ public class WorkflowContextTests
         var context = new WorkflowContext();
         var runner  = new WorkflowRunner(context, _ => new FakeTarget());
         await runner.ExecuteAsync(new FakeRequest());
-        Assert.NotNull(context.GetOrDefault<FakeResponse>("login"));
+        Assert.NotNull(context.GetOrDefault<FakeResponse>("FakeRequest"));
     }
 }
 
 public class GetOrDefaultInFromLambdaTests
 {
     private record TokenResponse(string Token);
-    private record LoginRequest() : WorkflowRequest<TokenResponse, LoginRequest>, IWorkflowRequest
+    private record LoginRequest() : WorkflowRequest<TokenResponse>
     {
-        public static string StepName => "login";
     }
     private record PayloadResponse(string Authorization);
-    private record ApiRequest() : WorkflowRequest<PayloadResponse, ApiRequest>, IWorkflowRequest
+    private record ApiRequest() : WorkflowRequest<PayloadResponse>
     {
-        public static string StepName => "api";
         public IFieldValue<string> Authorization { get; init; } =
-            From(ctx => ctx.GetOrDefault<TokenResponse>("login") is { } login
+            From(ctx => ctx.GetOrDefault<TokenResponse>("LoginRequest") is { } login
                 ? $"Bearer {login.Token}"
                 : "");
     }
 
     private class FakeLogin(string token) : ITarget
     {
-        public bool CanHandle(Type _) => true;
+        public bool CanHandle(string _) => true;
         public Task<T> ExecuteAsync<T>(WorkflowRequest<T> request, Dictionary<string, object?> resolvedFields, WorkflowContext context)
             => Task.FromResult((T)(object)new TokenResponse(token));
     }
@@ -125,9 +122,8 @@ public class FieldValueResolverTests
     private record TestResponse;
     private class TestProtocol;
 
-    private record TestRequest<TProtocol>() : WorkflowRequest<TestResponse, TestRequest<TProtocol>>, IWorkflowRequest
+    private record TestRequest<TProtocol>() : WorkflowRequest<TestResponse>
     {
-        public static string StepName => "test";
         public IFieldValue<string> Name  { get; init; } = Static("Alice");
         public IFieldValue<int>    Count { get; init; } = Static(42);
     }
@@ -142,8 +138,6 @@ public class FieldValueResolverTests
 
         Assert.Equal("Alice", resolved["Name"]);
         Assert.Equal(42, resolved["Count"]);
-        Assert.False(resolved.ContainsKey("StepName"));
-        Assert.False(resolved.ContainsKey("StepName"));
     }
 
     [Fact]
@@ -166,9 +160,8 @@ public class RecursiveFieldValueTests
         public IFieldValue<string> Value { get; init; } = Static("default");
     }
 
-    private record Outer() : WorkflowRequest<object, Outer>, IWorkflowRequest
+    private record Outer() : WorkflowRequest<object>
     {
-        public static string StepName => "test";
         public IFieldValue<Inner> Nested { get; init; } = Static(new Inner());
     }
 
@@ -182,9 +175,8 @@ public class RecursiveFieldValueTests
         public IFieldValue<DeepInner> Inner { get; init; } = Static(new DeepInner());
     }
 
-    private record DeepOuter() : WorkflowRequest<object, DeepOuter>, IWorkflowRequest
+    private record DeepOuter() : WorkflowRequest<object>
     {
-        public static string StepName => "test";
         public IFieldValue<MiddleLayer> Middle { get; init; } = Static(new MiddleLayer());
     }
 
@@ -305,9 +297,8 @@ public class BuildableRequestAccumulationTests
         public IFieldValue<int>    Count { get; init; } = Static(1);
     }
 
-    private record OrderRequest() : WorkflowRequest<FakeResponse, OrderRequest>, IWorkflowRequest
+    private record OrderRequest() : WorkflowRequest<FakeResponse>
     {
-        public static string StepName => "createOrder";
         public IFieldValue<List<object>> Items { get; init; } = From(ctx => ctx.GetAccumulated<LineItem>());
     }
 
@@ -539,22 +530,20 @@ public class MultiTargetWorkflowTests
     private record TokenResponse(string Token);
     private record UserResponse(string Id);
 
-    private record LoginRequest() : WorkflowRequest<TokenResponse, LoginRequest>, IWorkflowRequest
+    private record LoginRequest() : WorkflowRequest<TokenResponse>
     {
-        public static string StepName => "login";
     }
 
     // Token field resolves from the login capture — produced by a different target.
-    private record CreateUserRequest() : WorkflowRequest<UserResponse, CreateUserRequest>, IWorkflowRequest
+    private record CreateUserRequest() : WorkflowRequest<UserResponse>
     {
-        public static string StepName => "createUser";
-        public IFieldValue<string> Token { get; init; } = From(ctx => ctx.Get<TokenResponse>("login").Token);
+        public IFieldValue<string> Token { get; init; } = From(ctx => ctx.Get<TokenResponse>("LoginRequest").Token);
     }
 
     private class CountingFakeTarget<TResponse>(TResponse response) : ITarget
     {
         public int CallCount { get; private set; }
-        public bool CanHandle(Type _) => true;
+        public bool CanHandle(string _) => true;
         public Task<T> ExecuteAsync<T>(WorkflowRequest<T> request, Dictionary<string, object?> resolvedFields, WorkflowContext context)
         {
             CallCount++;
@@ -570,7 +559,7 @@ public class MultiTargetWorkflowTests
 
         var context = new WorkflowContext();
         var runner  = new WorkflowRunner(context,
-            n => n == "login" ? (ITarget)loginTarget : userTarget);
+            n => n == nameof(LoginRequest) ? (ITarget)loginTarget : userTarget);
 
         await runner.ExecuteAsync(new LoginRequest());
         await runner.ExecuteAsync(new CreateUserRequest());
@@ -587,13 +576,13 @@ public class MultiTargetWorkflowTests
 
         var context = new WorkflowContext();
         var runner  = new WorkflowRunner(context,
-            n => n == "login" ? (ITarget)loginTarget : userTarget);
+            n => n == nameof(LoginRequest) ? (ITarget)loginTarget : userTarget);
 
         await runner.ExecuteAsync(new LoginRequest());
         await runner.ExecuteAsync(new CreateUserRequest());
 
-        Assert.Equal("abc", context.Get<TokenResponse>("login").Token);
-        Assert.Equal("u1",  context.Get<UserResponse>("createUser").Id);
+        Assert.Equal("abc", context.Get<TokenResponse>("LoginRequest").Token);
+        Assert.Equal("u1",  context.Get<UserResponse>("CreateUserRequest").Id);
     }
 
     [Fact]
@@ -604,7 +593,7 @@ public class MultiTargetWorkflowTests
 
         var context = new WorkflowContext();
         var runner  = new WorkflowRunner(context,
-            n => n == "login" ? (ITarget)loginTarget : userTarget);
+            n => n == nameof(LoginRequest) ? (ITarget)loginTarget : userTarget);
 
         await runner.ExecuteAsync(new LoginRequest());
 

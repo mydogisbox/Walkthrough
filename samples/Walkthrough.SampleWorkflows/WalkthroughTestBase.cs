@@ -26,18 +26,16 @@ public abstract class WalkthroughTestBase
             .Register<EchoHeadersWithStepHeaderStep>()
             .WithHeaders(new Dictionary<string, IFieldValue<string>>
             {
-                ["Authorization"] = From(ctx => $"Bearer {ctx.GetOrDefault<LoginResponse>("login")?.Token ?? ""}")
+                ["Authorization"] = From(ctx => $"Bearer {ctx.GetOrDefault<LoginResponse>("LoginRequest")?.Token ?? ""}")
             });
 
         _runner = new WorkflowRunner(context, loginTarget, apiTarget);
     }
 
-    protected Task<TResponse> ExecuteAsync<TResponse, TSelf>(WorkflowRequest<TResponse, TSelf> request)
-        where TSelf : WorkflowRequest<TResponse, TSelf>, IWorkflowRequest
+    protected Task<TResponse> ExecuteAsync<TResponse>(WorkflowRequest<TResponse> request)
         => _runner.ExecuteAsync(request);
 
-    protected Task<object> ExecuteRawAsync<TResponse, TSelf>(WorkflowRequest<TResponse, TSelf> request)
-        where TSelf : WorkflowRequest<TResponse, TSelf>, IWorkflowRequest
+    protected Task<object> ExecuteRawAsync<TResponse>(WorkflowRequest<TResponse> request)
         => _runner.ExecuteRawAsync(request);
 
     protected Task<TResponse> BuildAsync<TResponse>(BuildableRequest<TResponse> item)

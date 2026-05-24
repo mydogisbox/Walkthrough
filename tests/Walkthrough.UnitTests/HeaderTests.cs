@@ -145,9 +145,8 @@ public class HttpTargetHeaderTests : IDisposable
 
     private record FakeResponse(string Id);
 
-    private record WithHeadersRequest() : WorkflowRequest<FakeResponse, WithHeadersRequest>, IWorkflowRequest
+    private record WithHeadersRequest() : WorkflowRequest<FakeResponse>
     {
-        public static string StepName => "doThing";
     }
     private class WithHeadersStep : HttpStep<WithHeadersRequest, FakeResponse, WithHeadersStep>, IHttpStep
     {
@@ -155,9 +154,8 @@ public class HttpTargetHeaderTests : IDisposable
         public static string Path => "/thing";
     }
 
-    private record StepLevelHeaderRequest() : WorkflowRequest<FakeResponse, StepLevelHeaderRequest>, IWorkflowRequest
+    private record StepLevelHeaderRequest() : WorkflowRequest<FakeResponse>
     {
-        public static string StepName => "doThing";
     }
     private class StepLevelHeaderStep : HttpStep<StepLevelHeaderRequest, FakeResponse, StepLevelHeaderStep>, IHttpStep
     {
@@ -167,9 +165,8 @@ public class HttpTargetHeaderTests : IDisposable
             => new() { ["X-Api-Version"] = "2" };
     }
 
-    private record PerRequestHeaderRequest() : WorkflowRequest<FakeResponse, PerRequestHeaderRequest>, IWorkflowRequest
+    private record PerRequestHeaderRequest() : WorkflowRequest<FakeResponse>
     {
-        public static string StepName => "doThing";
         public IFieldValue<string> XRequestId { get; init; } = Static("default");
     }
     private class PerRequestHeaderStep : HttpStep<PerRequestHeaderRequest, FakeResponse, PerRequestHeaderStep>, IHttpStep
@@ -180,9 +177,8 @@ public class HttpTargetHeaderTests : IDisposable
             => new() { ["X-Request-Id"] = resolvedFields["XRequestId"]?.ToString() ?? "" };
     }
 
-    private record StepVsTargetRequest() : WorkflowRequest<FakeResponse, StepVsTargetRequest>, IWorkflowRequest
+    private record StepVsTargetRequest() : WorkflowRequest<FakeResponse>
     {
-        public static string StepName => "doThing";
     }
     private class StepVsTargetStep : HttpStep<StepVsTargetRequest, FakeResponse, StepVsTargetStep>, IHttpStep
     {
@@ -192,9 +188,8 @@ public class HttpTargetHeaderTests : IDisposable
             => new() { ["X-Level"] = "step" };
     }
 
-    private record RequestFieldDrivesHeaderRequest() : WorkflowRequest<FakeResponse, RequestFieldDrivesHeaderRequest>, IWorkflowRequest
+    private record RequestFieldDrivesHeaderRequest() : WorkflowRequest<FakeResponse>
     {
-        public static string StepName => "doThing";
         public IFieldValue<string> Level { get; init; } = Static("step-default");
     }
     private class RequestFieldDrivesHeaderStep : HttpStep<RequestFieldDrivesHeaderRequest, FakeResponse, RequestFieldDrivesHeaderStep>, IHttpStep
@@ -294,9 +289,8 @@ public class HttpTargetHeaderTests : IDisposable
     // Auth expressed as a target-level header using From.
     // Uses a separate in-memory target for login so only one HTTP request hits the listener.
     private record FakeTokenResponse(string Token);
-    private record FromAuthRequest() : WorkflowRequest<FakeResponse, FromAuthRequest>, IWorkflowRequest
+    private record FromAuthRequest() : WorkflowRequest<FakeResponse>
     {
-        public static string StepName => "doThing";
     }
     private class FromAuthStep : HttpStep<FromAuthRequest, FakeResponse, FromAuthStep>, IHttpStep
     {
@@ -304,13 +298,12 @@ public class HttpTargetHeaderTests : IDisposable
         public static string Path => "/thing";
     }
 
-    private record FakeLoginRequest() : WorkflowRequest<FakeTokenResponse, FakeLoginRequest>, IWorkflowRequest
+    private record FakeLoginRequest() : WorkflowRequest<FakeTokenResponse>
     {
-        public static string StepName => "login";
     }
     private class FakeLoginTarget(FakeTokenResponse response) : ITarget
     {
-        public bool CanHandle(Type _) => true;
+        public bool CanHandle(string _) => true;
         public Task<TResponse> ExecuteAsync<TResponse>(WorkflowRequest<TResponse> request, Dictionary<string, object?> resolvedFields, WorkflowContext context)
             => Task.FromResult((TResponse)(object)response);
     }
@@ -323,10 +316,10 @@ public class HttpTargetHeaderTests : IDisposable
             .Register<FromAuthStep>()
             .WithHeaders(new Dictionary<string, IFieldValue<string>>
             {
-                ["Authorization"] = From(ctx => $"Bearer {ctx.Get<FakeTokenResponse>("login").Token}")
+                ["Authorization"] = From(ctx => $"Bearer {ctx.Get<FakeTokenResponse>(nameof(FakeLoginRequest)).Token}")
             });
-        var runner = new WorkflowRunner(new WorkflowContext(), stepName =>
-            stepName == "login" ? (ITarget)fakeLogin : httpTarget);
+        var runner = new WorkflowRunner(new WorkflowContext(), key =>
+            key == nameof(FakeLoginRequest) ? (ITarget)fakeLogin : httpTarget);
 
         await runner.ExecuteAsync(new FakeLoginRequest());
         await runner.ExecuteAsync(new FromAuthRequest());

@@ -196,11 +196,11 @@ public class MapBody_ExplicitFieldMapping_WorksCorrectly
             .Register<ExplicitCreateUserStep>()
             .WithHeaders(new Dictionary<string, IFieldValue<string>>
             {
-                ["Authorization"] = From(ctx => $"Bearer {ctx.Get<LoginResponse>("login").Token}")
+                ["Authorization"] = From(ctx => $"Bearer {ctx.Get<LoginResponse>("LoginRequest").Token}")
             });
 
         var runner = new WorkflowRunner(context,
-            stepName => stepName == "login" ? (ITarget)loginTarget : apiTarget);
+            key => key == nameof(LoginRequest) ? (ITarget)loginTarget : apiTarget);
 
         await runner.ExecuteAsync(new LoginRequest());
         var user = await runner.ExecuteAsync(new CreateUserRequest());
@@ -261,12 +261,12 @@ public class PlacedOrder_CanBePolled
             .Register<GetOrderStep>()
             .WithHeaders(new Dictionary<string, IFieldValue<string>>
             {
-                ["Authorization"] = From(ctx => $"Bearer {ctx.Get<LoginResponse>("login").Token}")
+                ["Authorization"] = From(ctx => $"Bearer {ctx.Get<LoginResponse>("LoginRequest").Token}")
             });
 
         var runner = new WorkflowRunner(
             new WorkflowContext(),
-            stepName => stepName == "login" ? (ITarget)authTarget : apiTarget);
+            key => key == nameof(LoginRequest) ? (ITarget)authTarget : apiTarget);
 
         await runner.ExecuteAsync(new LoginRequest());
         await runner.ExecuteAsync(new CreateUserRequest());
@@ -328,12 +328,12 @@ public class MixedItemTypes_MappedByType
             .Register<TypeMappedOrderStep>()
             .WithHeaders(new Dictionary<string, IFieldValue<string>>
             {
-                ["Authorization"] = From(ctx => $"Bearer {ctx.Get<LoginResponse>("login").Token}")
+                ["Authorization"] = From(ctx => $"Bearer {ctx.Get<LoginResponse>("LoginRequest").Token}")
             });
 
         var runner = new WorkflowRunner(
             new WorkflowContext(),
-            stepName => stepName == "login" ? (ITarget)authTarget : apiTarget);
+            key => key == nameof(LoginRequest) ? (ITarget)authTarget : apiTarget);
 
         await runner.ExecuteAsync(new LoginRequest());
         await runner.ExecuteAsync(new CreateUserRequest());
@@ -360,7 +360,7 @@ public class Login_ViaCustomTarget_CanPlaceOrder
         private static readonly HttpClient _http = new();
         private static readonly JsonSerializerOptions _readOptions = new() { PropertyNameCaseInsensitive = true };
 
-        public bool CanHandle(Type _) => true;
+        public bool CanHandle(string _) => true;
 
         public async Task<TResponse> ExecuteAsync<TResponse>(
             WorkflowRequest<TResponse> request, Dictionary<string, object?> resolvedFields, WorkflowContext context)
@@ -382,12 +382,12 @@ public class Login_ViaCustomTarget_CanPlaceOrder
             .Register<CreateOrderStep>()
             .WithHeaders(new Dictionary<string, IFieldValue<string>>
             {
-                ["Authorization"] = From(ctx => $"Bearer {ctx.Get<LoginResponse>("login").Token}")
+                ["Authorization"] = From(ctx => $"Bearer {ctx.Get<LoginResponse>("LoginRequest").Token}")
             });
 
         var runner = new WorkflowRunner(
             new WorkflowContext(),
-            stepName => stepName == "login"
+            key => key == nameof(LoginRequest)
                 ? (ITarget)new DirectLoginTarget(SampleApiUrl)
                 : httpTarget);
 
@@ -417,13 +417,13 @@ public class ThreeTargets_HttpAndDirectMixed
         private static readonly JsonSerializerOptions _readOptions =
             new() { PropertyNameCaseInsensitive = true };
 
-        public bool CanHandle(Type _) => true;
+        public bool CanHandle(string _) => true;
 
         public async Task<TResponse> ExecuteAsync<TResponse>(
             WorkflowRequest<TResponse> request, Dictionary<string, object?> resolvedFields, WorkflowContext context)
         {
             var orderId = resolvedFields["OrderId"]?.ToString();
-            var token   = context.Get<LoginResponse>("login").Token;
+            var token   = context.Get<LoginResponse>("LoginRequest").Token;
 
             var httpRequest = new HttpRequestMessage(HttpMethod.Get, $"{baseUrl}/orders/{orderId}");
             httpRequest.Headers.TryAddWithoutValidation("Authorization", $"Bearer {token}");
@@ -444,17 +444,17 @@ public class ThreeTargets_HttpAndDirectMixed
             .Register<CreateOrderStep>()
             .WithHeaders(new Dictionary<string, IFieldValue<string>>
             {
-                ["Authorization"] = From(ctx => $"Bearer {ctx.Get<LoginResponse>("login").Token}")
+                ["Authorization"] = From(ctx => $"Bearer {ctx.Get<LoginResponse>("LoginRequest").Token}")
             });
         var directTarget = new DirectGetOrderTarget(SampleApiUrl);
 
         var runner = new WorkflowRunner(
             new WorkflowContext(),
-            stepName => stepName switch
+            key => key switch
             {
-                "login"    => (ITarget)authTarget,
-                "getOrder" => directTarget,
-                _          => apiTarget
+                nameof(LoginRequest)    => (ITarget)authTarget,
+                nameof(GetOrderRequest) => directTarget,
+                _                       => apiTarget
             });
 
         await runner.ExecuteAsync(new LoginRequest());
@@ -486,7 +486,7 @@ public class MultiTarget_EachTargetHandlesItsOwnSteps
             .Register<CreateOrderStep>()
             .WithHeaders(new Dictionary<string, IFieldValue<string>>
             {
-                ["Authorization"] = From(ctx => $"Bearer {ctx.Get<LoginResponse>("login").Token}")
+                ["Authorization"] = From(ctx => $"Bearer {ctx.Get<LoginResponse>("LoginRequest").Token}")
             });
 
         var runner = new WorkflowRunner(new WorkflowContext(), loginTarget, apiTarget);
@@ -523,7 +523,7 @@ public class SameWorkflow_DifferentTargetImplementations
     {
         private static readonly HttpClient _http = new();
 
-        public bool CanHandle(Type _) => true;
+        public bool CanHandle(string _) => true;
 
         public async Task<TResponse> ExecuteAsync<TResponse>(
             WorkflowRequest<TResponse> request, Dictionary<string, object?> resolvedFields, WorkflowContext context)
@@ -545,11 +545,11 @@ public class SameWorkflow_DifferentTargetImplementations
             .Register<CreateOrderStep>()
             .WithHeaders(new Dictionary<string, IFieldValue<string>>
             {
-                ["Authorization"] = From(ctx => $"Bearer {ctx.Get<LoginResponse>("login").Token}")
+                ["Authorization"] = From(ctx => $"Bearer {ctx.Get<LoginResponse>("LoginRequest").Token}")
             });
 
         var order = await PlaceOrder(
-            stepName => stepName == "login" ? (ITarget)authTarget : apiTarget);
+            key => key == nameof(LoginRequest) ? (ITarget)authTarget : apiTarget);
 
         Assert.Equal("pending", order.Status);
         Assert.Single(order.Items);
@@ -563,11 +563,11 @@ public class SameWorkflow_DifferentTargetImplementations
             .Register<CreateOrderStep>()
             .WithHeaders(new Dictionary<string, IFieldValue<string>>
             {
-                ["Authorization"] = From(ctx => $"Bearer {ctx.Get<LoginResponse>("login").Token}")
+                ["Authorization"] = From(ctx => $"Bearer {ctx.Get<LoginResponse>("LoginRequest").Token}")
             });
 
         var order = await PlaceOrder(
-            stepName => stepName == "login"
+            key => key == nameof(LoginRequest)
                 ? (ITarget)new DirectLoginTarget(SampleApiUrl)
                 : apiTarget);
 

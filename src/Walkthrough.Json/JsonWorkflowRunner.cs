@@ -1,7 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Walkthrough.Http;
 
 namespace Walkthrough.Json;
 
@@ -112,10 +111,17 @@ public class JsonWorkflowRunner
     /// <summary>
     /// Executes a workflow given pre-loaded step contracts and target definitions.
     /// </summary>
-    public static async Task<WorkflowResult> RunAsync(
+    public static Task<WorkflowResult> RunAsync(
         WorkflowDefinition workflow,
         Dictionary<string, StepContractDefinition> contracts,
         List<TargetDefinition> targets,
+        IReadOnlyDictionary<string, WorkflowDefinition>? namedWorkflows = null)
+        => RunAsync(workflow, contracts, targets.Select(t => new JsonHttpTarget(t)).ToList(), namedWorkflows);
+
+    private static async Task<WorkflowResult> RunAsync(
+        WorkflowDefinition workflow,
+        Dictionary<string, StepContractDefinition> contracts,
+        List<JsonHttpTarget> targets,
         IReadOnlyDictionary<string, WorkflowDefinition>? namedWorkflows = null)
     {
         var captures = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
@@ -161,7 +167,7 @@ public class JsonWorkflowRunner
     private static async Task<List<StepResult>> ExecuteStepsAsync(
         IEnumerable<StepInvocation> steps,
         Dictionary<string, StepContractDefinition> contracts,
-        List<TargetDefinition> targets,
+        List<JsonHttpTarget> targets,
         Dictionary<string, object?> captures,
         IReadOnlyDictionary<string, WorkflowDefinition> namedWorkflows)
     {
@@ -185,7 +191,7 @@ public class JsonWorkflowRunner
     private static async Task<List<StepResult>> ExecuteNestedWorkflowAsync(
         string workflowRef,
         Dictionary<string, StepContractDefinition> contracts,
-        List<TargetDefinition> targets,
+        List<JsonHttpTarget> targets,
         Dictionary<string, object?> captures,
         IReadOnlyDictionary<string, WorkflowDefinition> namedWorkflows)
     {
@@ -206,76 +212,36 @@ public class JsonWorkflowRunner
     private static async Task<StepResult> ExecuteStepAsync(
         StepInvocation invocation,
         Dictionary<string, StepContractDefinition> contracts,
-        List<TargetDefinition> targets,
+        List<JsonHttpTarget> targets,
         Dictionary<string, object?> captures)
     {
         var stepName = invocation.Step!;
 
         contracts.TryGetValue(stepName, out var contract);
 
-        var targetDef = targets.FirstOrDefault(t => t.Steps?.ContainsKey(stepName) == true);
-        if (targetDef is null)
-            throw new JsonWorkflowException(
+        var target = targets.FirstOrDefault(t => t.CanHandle(stepName))
+            ?? throw new JsonWorkflowException(
                 $"Step '{stepName}' not found in any loaded target. " +
-                $"Loaded targets cover: [{string.Join(", ", targets.SelectMany(t => t.Steps?.Keys ?? (IEnumerable<string>)[]))}]");
+                $"Loaded targets cover: [{string.Join(", ", targets.SelectMany(t => t.StepNames))}]");
 
-        var targetStep = targetDef.Steps![stepName];
-
-        var pathParams    = ResolveFieldGroup(targetStep.PathParams, invocation.PathParams, captures);
-        var rawQuery      = ResolveFieldGroup(targetStep.Query,       invocation.Query,      captures);
-        var queryParams   = rawQuery.ToDictionary(
-            kv => kv.Key, kv => kv.Value?.ToString() ?? "", StringComparer.OrdinalIgnoreCase);
-        var rawHeaders  = ResolveFieldGroup(targetDef.Headers,      null,                  captures);
-        foreach (var kv in ResolveFieldGroup(targetStep.Headers, invocation.Headers, captures))
-            rawHeaders[kv.Key] = kv.Value;
-        var headers = rawHeaders.ToDictionary(
-            kv => kv.Key, kv => kv.Value?.ToString() ?? "", StringComparer.OrdinalIgnoreCase);
-        var bodyFields  = MergeAndResolve(contract?.Defaults, invocation.With, captures);
-        var baseUrl = targetDef.BaseUrl;
-        var method = new HttpMethod(targetStep.Method.ToUpper());
+        var bodyFields = MergeAndResolve(contract?.Defaults, invocation.With, captures);
 
         if (invocation.CaptureRequestAs is { } requestKey)
             captures[requestKey] = bodyFields;
 
         if (invocation.CaptureFullResponseAs is { } fullResponseKey)
         {
-            var (statusCode, rawBody) = await HttpExecutor.SendRawAsync(
-                baseUrl, method, targetStep.Path, pathParams, queryParams, bodyFields, headers);
-
-            object? parsedBody;
-            try
-            {
-                using var doc = JsonDocument.Parse(rawBody);
-                parsedBody = doc.RootElement.ValueKind == JsonValueKind.Array
-                    ? doc.RootElement.EnumerateArray()
-                        .Select(e => JsonValueResolver.JsonElementToObject(e))
-                        .ToList<object?>()
-                    : JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(rawBody, HttpExecutor.DeserializeOptions);
-            }
-            catch
-            {
-                parsedBody = rawBody;
-            }
-
-            var fullResponse = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["status"] = statusCode,
-                ["body"] = parsedBody
-            };
+            var fullResponse = await target.ExecuteRawAsync(
+                stepName, bodyFields,
+                invocation.PathParams, invocation.Query, invocation.Headers, captures);
 
             captures[fullResponseKey] = fullResponse;
             return new StepResult(fullResponseKey, bodyFields, fullResponse);
         }
 
-        var responseJson = await HttpExecutor.SendAsync(
-            baseUrl, method, targetStep.Path, pathParams, queryParams, bodyFields, headers);
-
-        using var doc2 = JsonDocument.Parse(responseJson);
-        object? captured = doc2.RootElement.ValueKind == JsonValueKind.Array
-            ? doc2.RootElement.EnumerateArray()
-                .Select(e => JsonValueResolver.JsonElementToObject(e))
-                .ToList<object?>()
-            : JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(responseJson, HttpExecutor.DeserializeOptions);
+        var captured = await target.ExecuteAsync(
+            stepName, bodyFields,
+            invocation.PathParams, invocation.Query, invocation.Headers, captures);
 
         var captureName = invocation.CaptureAs ?? stepName;
         captures[captureName] = captured;
@@ -316,7 +282,7 @@ public class JsonWorkflowRunner
     private static async Task<StepResult> PollStepAsync(
         StepInvocation invocation,
         Dictionary<string, StepContractDefinition> contracts,
-        List<TargetDefinition> targets,
+        List<JsonHttpTarget> targets,
         Dictionary<string, object?> captures)
     {
         var stepName = invocation.Poll!;
@@ -376,22 +342,6 @@ public class JsonWorkflowRunner
             }
         }
         return result;
-    }
-
-    private static Dictionary<string, object?> ResolveFieldGroup(
-        Dictionary<string, FieldValueDefinition>? defs,
-        Dictionary<string, FieldValueDefinition>? overrides,
-        Dictionary<string, object?> captures)
-    {
-        var merged = new Dictionary<string, FieldValueDefinition>(StringComparer.OrdinalIgnoreCase);
-        if (defs is not null)
-            foreach (var (k, v) in defs) merged[k] = v;
-        if (overrides is not null)
-            foreach (var (k, v) in overrides) merged[k] = v;
-        return merged.ToDictionary(
-            kv => kv.Key,
-            kv => JsonValueResolver.Resolve(kv.Value).Resolve(captures),
-            StringComparer.OrdinalIgnoreCase);
     }
 
     // ── Assertions ───────────────────────────────────────────────────────────

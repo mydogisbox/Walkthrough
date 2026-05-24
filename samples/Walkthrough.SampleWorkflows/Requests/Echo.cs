@@ -3,10 +3,7 @@ using Walkthrough.Http;
 
 namespace Walkthrough.SampleWorkflows;
 
-public record EchoHeadersRequest() : WorkflowRequest<Dictionary<string, string>, EchoHeadersRequest>, IWorkflowRequest
-{
-    public static string StepName => "echoHeaders";
-}
+public record EchoHeadersRequest() : WorkflowRequest<Dictionary<string, string>>;
 
 public class EchoHeadersStep : HttpStep<EchoHeadersRequest, Dictionary<string, string>, EchoHeadersStep>, IHttpStep
 {
@@ -14,10 +11,7 @@ public class EchoHeadersStep : HttpStep<EchoHeadersRequest, Dictionary<string, s
     public static string     Path   => "/echo/headers";
 }
 
-public record EchoHeadersWithStepHeaderRequest() : WorkflowRequest<Dictionary<string, string>, EchoHeadersWithStepHeaderRequest>, IWorkflowRequest
-{
-    public static string StepName => "echoHeadersWithStepHeader";
-}
+public record EchoHeadersWithStepHeaderRequest() : WorkflowRequest<Dictionary<string, string>>;
 
 public class EchoHeadersWithStepHeaderStep : HttpStep<EchoHeadersWithStepHeaderRequest, Dictionary<string, string>, EchoHeadersWithStepHeaderStep>, IHttpStep
 {

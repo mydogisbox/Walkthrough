@@ -40,17 +40,17 @@ public class WorkflowContext
     /// <summary>
     /// Retrieves the captured response of a previous step by step name.
     /// </summary>
-    public T Get<T>(string stepName)
+    public T Get<T>(string key)
     {
-        if (!_captures.TryGetValue(stepName, out var value))
+        if (!_captures.TryGetValue(key, out var value))
             throw new WorkflowContextException(
-                $"No captured response found for step '{stepName}'. " +
+                $"No captured response found for '{key}'. " +
                 $"Ensure the step has been executed before referencing its output. " +
-                $"Available steps: [{string.Join(", ", _captures.Keys)}]");
+                $"Available keys: [{string.Join(", ", _captures.Keys)}]");
 
         if (value is not T typed)
             throw new WorkflowContextException(
-                $"Captured response for step '{stepName}' is of type '{value.GetType().Name}', " +
+                $"Captured response for '{key}' is of type '{value.GetType().Name}', " +
                 $"not '{typeof(T).Name}'.");
 
         return typed;
@@ -59,9 +59,9 @@ public class WorkflowContext
     /// <summary>
     /// Returns the captured response for the given step name, or null if the step has not run.
     /// </summary>
-    public T? GetOrDefault<T>(string stepName) where T : class
+    public T? GetOrDefault<T>(string key) where T : class
     {
-        if (_captures.TryGetValue(stepName, out var value) && value is T typed)
+        if (_captures.TryGetValue(key, out var value) && value is T typed)
             return typed;
         return null;
     }
@@ -70,12 +70,12 @@ public class WorkflowContext
     /// Returns the raw captured object for a step without type casting.
     /// Used by JSON workflow runners where the response type is not known at compile time.
     /// </summary>
-    public object? GetRaw(string stepName)
+    public object? GetRaw(string key)
     {
-        if (!_captures.TryGetValue(stepName, out var value))
+        if (!_captures.TryGetValue(key, out var value))
             throw new WorkflowContextException(
-                $"No captured response found for step '{stepName}'. " +
-                $"Available steps: [{string.Join(", ", _captures.Keys)}]");
+                $"No captured response found for '{key}'. " +
+                $"Available keys: [{string.Join(", ", _captures.Keys)}]");
         return value;
     }
 
@@ -83,8 +83,8 @@ public class WorkflowContext
     /// Captures a raw response under the given step name.
     /// Used by runners and JSON workflow runners.
     /// </summary>
-    public void CaptureRaw(string stepName, object response)
+    public void CaptureRaw(string key, object response)
     {
-        _captures[stepName] = response;
+        _captures[key] = response;
     }
 }

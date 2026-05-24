@@ -1,6 +1,6 @@
 # C# style
 
-_Current version: 0.5.3. Upgrading from 0.4.0? See [upgrade-0.4-to-0.5.md](upgrade-0.4-to-0.5.md). Upgrading from 0.3.0? See [upgrade-0.3-to-0.4.md](upgrade-0.3-to-0.4.md)._
+_Current version: 0.6.1. Upgrading from 0.5.x? See [upgrade-0.5-to-0.6.md](upgrade-0.5-to-0.6.md). Upgrading from 0.4.0? See [upgrade-0.4-to-0.5.md](upgrade-0.4-to-0.5.md). Upgrading from 0.3.0? See [upgrade-0.3-to-0.4.md](upgrade-0.3-to-0.4.md)._
 
 ---
 
@@ -16,7 +16,7 @@ Three factories are available via `using static Walkthrough.Core.FieldValues`:
 public IFieldValue<string> Id      { get; init; } = Generated(() => Guid.NewGuid().ToString());
 public IFieldValue<string> Email   { get; init; } = Generated(() => $"user-{Guid.NewGuid():N}@example.com");
 public IFieldValue<string> Name    { get; init; } = Generators.RandomName(); // Generators returns Generated(...)
-public IFieldValue<string> Token   { get; init; } = From(ctx => ctx.Get<LoginResponse>("login").Token);
+public IFieldValue<string> Token   { get; init; } = From(ctx => ctx.Get<LoginResponse>(nameof(LoginRequest)).Token);
 public IFieldValue<string> BaseUrl { get; init; } = Static("http://localhost:5020");
 ```
 
@@ -25,7 +25,19 @@ public IFieldValue<string> BaseUrl { get; init; } = Static("http://localhost:502
 `GetOrDefault` returns the captured response or `null` if the step hasn't run — useful in `From` lambdas where a prior step is optional:
 
 ```csharp
-["Authorization"] = From(ctx => $"Bearer {ctx.GetOrDefault<LoginResponse>("login")?.Token ?? ""}")
+["Authorization"] = From(ctx => $"Bearer {ctx.GetOrDefault<LoginResponse>(nameof(LoginRequest))?.Token ?? ""}")
+```
+
+---
+
+## Captures
+
+Responses are captured under the request type name (`request.GetType().Name`). Reference them with `nameof` for compile-time safety:
+
+```csharp
+ctx.Get<LoginResponse>(nameof(LoginRequest))
+ctx.Get<UserResponse>(nameof(CreateUserRequest))
+ctx.Get<OrderResponse>(nameof(CreateOrderRequest))
 ```
 
 ---
@@ -68,10 +80,9 @@ public record AddOrderItem() : BuildableRequest<AddOrderItemResponse>
     public IFieldValue<decimal> UnitPrice   { get; init; } = Static(9.99m);
 }
 
-public record CreateOrderRequest() : WorkflowRequest<OrderResponse, CreateOrderRequest>, IWorkflowRequest
+public record CreateOrderRequest() : WorkflowRequest<OrderResponse>
 {
-    public static string StepName => "createOrder";
-    public IFieldValue<string>       UserId { get; init; } = From(ctx => ctx.Get<UserResponse>("createUser").Id);
+    public IFieldValue<string>       UserId { get; init; } = From(ctx => ctx.Get<UserResponse>(nameof(CreateUserRequest)).Id);
     public IFieldValue<List<object>> Items  { get; init; } = From(ctx => ctx.GetAccumulated<AddOrderItem>());
 }
 
@@ -97,10 +108,9 @@ public class CreateOrderStep : HttpStep<CreateOrderRequest, OrderResponse, Creat
 Path parameters are declared on the **request** as `IFieldValue<string>` fields. The step's `Path` contains `{placeholder}` segments — the step auto-extracts values by matching placeholder names to request field names (case-insensitive). Path param fields are automatically excluded from the request body.
 
 ```csharp
-public record GetOrderRequest() : WorkflowRequest<OrderResponse, GetOrderRequest>, IWorkflowRequest
+public record GetOrderRequest() : WorkflowRequest<OrderResponse>
 {
-    public static string StepName => "getOrder";
-    public IFieldValue<string> OrderId { get; init; } = From(ctx => ctx.Get<OrderResponse>("createOrder").Id);
+    public IFieldValue<string> OrderId { get; init; } = From(ctx => ctx.Get<OrderResponse>(nameof(CreateOrderRequest)).Id);
 }
 
 public class GetOrderStep : HttpStep<GetOrderRequest, OrderResponse, GetOrderStep>, IHttpStep
@@ -113,11 +123,10 @@ public class GetOrderStep : HttpStep<GetOrderRequest, OrderResponse, GetOrderSte
 Query parameters are declared via `MapQuery` on the step, which receives the resolved request fields and returns the query string key-value pairs:
 
 ```csharp
-public record SearchOrdersRequest() : WorkflowRequest<List<OrderResponse>, SearchOrdersRequest>, IWorkflowRequest
+public record SearchOrdersRequest() : WorkflowRequest<List<OrderResponse>>
 {
-    public static string StepName => "searchOrders";
     public IFieldValue<string> Status { get; init; } = Static("pending");
-    public IFieldValue<string> UserId { get; init; } = From(ctx => ctx.Get<UserResponse>("createUser").Id);
+    public IFieldValue<string> UserId { get; init; } = From(ctx => ctx.Get<UserResponse>(nameof(CreateUserRequest)).Id);
 }
 
 public class SearchOrdersStep : HttpStep<SearchOrdersRequest, List<OrderResponse>, SearchOrdersStep>, IHttpStep
@@ -177,7 +186,7 @@ public class PlacedOrder_CanBeRetrieved : WalkthroughTestBase
 
 ## Polling
 
-`PollAsync` re-executes a step on an interval until a predicate passes or the timeout is reached. The final response is captured under the step name and returned:
+`PollAsync` re-executes a step on an interval until a predicate passes or the timeout is reached. The final response is captured under the request type name and returned:
 
 ```csharp
 var order = await runner.PollAsync(
@@ -196,7 +205,7 @@ Assert.Equal("shipped", order.Status);
 Use `PollAsync` directly on `WorkflowRunner`, not through the `WalkthroughTestBase` helpers:
 
 ```csharp
-var runner = new WorkflowRunner(new WorkflowContext(), stepName => ...);
+var runner = new WorkflowRunner(new WorkflowContext(), key => ...);
 await runner.ExecuteAsync(new LoginRequest());
 await runner.ExecuteAsync(new CreateOrderRequest());
 
@@ -242,7 +251,7 @@ Assert.Equal(400, raw.StatusCode);
 
 All captures are shared through the same `WorkflowContext` regardless of which target produced them. A `From` lambda can read captures from any prior step, even one that ran against a different target.
 
-`WorkflowRunner` accepts multiple targets directly. Each request is routed to the first target whose `CanHandle` returns true. `HttpTarget.CanHandle` returns true only for request types it has a registered step for, so targets act as precise overrides with the last target serving as the catch-all:
+`WorkflowRunner` accepts multiple targets directly. Each request is routed to the first target whose `CanHandle` returns true. `HttpTarget.CanHandle` returns true only for request type names it has a registered step for, so targets act as precise overrides with the last target serving as the catch-all:
 
 ```csharp
 var loginTarget = new HttpTarget(SampleApiUrl)
@@ -253,7 +262,7 @@ var apiTarget = new HttpTarget(SampleApiUrl)
     .Register<CreateOrderStep>()
     .WithHeaders(new Dictionary<string, IFieldValue<string>>
     {
-        ["Authorization"] = From(ctx => $"Bearer {ctx.Get<LoginResponse>("login").Token}")
+        ["Authorization"] = From(ctx => $"Bearer {ctx.Get<LoginResponse>(nameof(LoginRequest)).Token}")
     });
 
 var runner = new WorkflowRunner(new WorkflowContext(), loginTarget, apiTarget);
@@ -263,20 +272,20 @@ var runner = new WorkflowRunner(new WorkflowContext(), loginTarget, apiTarget);
 
 ### Custom ITarget
 
-Any class can implement `ITarget`. `CanHandle` controls routing — return true for all types a catch-all handles, or check specific types for a targeted override:
+Any class can implement `ITarget`. `CanHandle` takes a string key — for C# workflows this is the request type name. Return true for the keys this target handles:
 
 ```csharp
 private class DirectGetOrderTarget(string baseUrl) : ITarget
 {
     private static readonly HttpClient _http = new();
 
-    public bool CanHandle(Type requestType) => requestType == typeof(GetOrderRequest);
+    public bool CanHandle(string key) => key == nameof(GetOrderRequest);
 
     public async Task<TResponse> ExecuteAsync<TResponse>(
         WorkflowRequest<TResponse> request, Dictionary<string, object?> resolvedFields, WorkflowContext context)
     {
         var orderId = resolvedFields["OrderId"]?.ToString();
-        var token   = context.Get<LoginResponse>("login").Token;
+        var token   = context.Get<LoginResponse>(nameof(LoginRequest)).Token;
 
         var req = new HttpRequestMessage(HttpMethod.Get, $"{baseUrl}/orders/{orderId}");
         req.Headers.TryAddWithoutValidation("Authorization", $"Bearer {token}");
@@ -292,7 +301,7 @@ var runner = new WorkflowRunner(new WorkflowContext(),
     new DirectGetOrderTarget(SampleApiUrl), authTarget, apiTarget);
 ```
 
-For cases where type-based routing isn't enough, `WorkflowRunner` also accepts a `Func<string, ITarget>` resolver that maps step names directly.
+For cases where type-based routing isn't enough, `WorkflowRunner` also accepts a `Func<string, ITarget>` resolver that maps keys directly.
 
 ### Dispatching through a registered HttpStep
 
@@ -321,9 +330,9 @@ private static async Task<OrderResponse> PlaceOrder(Func<string, ITarget> resolv
     return await runner.ExecuteAsync(new CreateOrderRequest());
 }
 
-await PlaceOrder(stepName => stepName == "login" ? (ITarget)authTarget : apiTarget);
+await PlaceOrder(key => key == nameof(LoginRequest) ? (ITarget)authTarget : apiTarget);
 
-await PlaceOrder(stepName => stepName == "login"
+await PlaceOrder(key => key == nameof(LoginRequest)
     ? (ITarget)new DirectLoginTarget(SampleApiUrl)
     : apiTarget);
 ```
@@ -332,7 +341,7 @@ await PlaceOrder(stepName => stepName == "login"
 
 ## Field value resolution
 
-`FieldValueResolver` resolves `IFieldValue<T>` properties on any request or build item. Resolution is recursive: after resolving `IFieldValue<T>` → `T`, if `T` is itself a record with `IFieldValue<U>` properties, those are resolved too — producing a nested `Dictionary<string, object?>`. List elements are also recursed into.
+`FieldValueResolver` resolves `IFieldValue<T>` properties on any request or build item. Resolution is recursive: after resolving `IFieldValue<T>` -> `T`, if `T` is itself a record with `IFieldValue<U>` properties, those are resolved too — producing a nested `Dictionary<string, object?>`. List elements are also recursed into.
 
 ```csharp
 public record RegionFields
@@ -348,10 +357,9 @@ public record AddressFields
     public IFieldValue<RegionFields> Region { get; init; } = Static(new RegionFields());
 }
 
-public record UpdateUserAddressRequest() : WorkflowRequest<UpdateUserAddressResponse, UpdateUserAddressRequest>, IWorkflowRequest
+public record UpdateUserAddressRequest() : WorkflowRequest<UpdateUserAddressResponse>
 {
-    public static string StepName => "updateUserAddress";
-    public IFieldValue<string>        UserId  { get; init; } = From(ctx => ctx.Get<UserResponse>("createUser").Id);
+    public IFieldValue<string>        UserId  { get; init; } = From(ctx => ctx.Get<UserResponse>(nameof(CreateUserRequest)).Id);
     public IFieldValue<AddressFields> Address { get; init; } = Static(new AddressFields());
 }
 
@@ -467,9 +475,8 @@ public class CreateItemStep : HttpStep<CreateItemRequest, ItemResponse, CreateIt
 To drive a header from a request field, add an `IFieldValue<string>` to the request and read it in `MapHeaders`:
 
 ```csharp
-public record CreateItemRequest() : WorkflowRequest<ItemResponse, CreateItemRequest>, IWorkflowRequest
+public record CreateItemRequest() : WorkflowRequest<ItemResponse>
 {
-    public static string StepName => "createItem";
     public IFieldValue<string> RequestId { get; init; } = Generated(() => Guid.NewGuid().ToString());
 }
 
@@ -490,6 +497,6 @@ new HttpTarget(SampleApiUrl)
     .WithHeaders(new Dictionary<string, IFieldValue<string>>
     {
         ["X-Tenant-Id"]   = Static("acme"),
-        ["Authorization"] = From(ctx => $"Bearer {ctx.Get<LoginResponse>("login").Token}")
+        ["Authorization"] = From(ctx => $"Bearer {ctx.Get<LoginResponse>(nameof(LoginRequest)).Token}")
     })
 ```

@@ -10,7 +10,8 @@ public interface ITarget
     Task<TResponse> ExecuteAsync<TResponse>(WorkflowRequest<TResponse> request, Dictionary<string, object?> resolvedFields, WorkflowContext context);
 
     /// <summary>
-    /// Returns true if this target can handle requests of the given type.
+    /// Returns true if this target can handle the given key.
+    /// For C# workflows the key is the request type name; for JSON workflows it is the step name.
     /// </summary>
-    bool CanHandle(Type requestType);
+    bool CanHandle(string key);
 }

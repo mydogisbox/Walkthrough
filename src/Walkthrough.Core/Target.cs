@@ -8,13 +8,13 @@ public abstract class Target<TSelf, TStep>
     where TSelf : Target<TSelf, TStep>
     where TStep : IStep
 {
-    protected readonly Dictionary<Type, TStep> _steps = [];
+    protected readonly Dictionary<string, TStep> _steps = new(StringComparer.OrdinalIgnoreCase);
 
-    public bool CanHandle(Type requestType) => _steps.ContainsKey(requestType);
+    public bool CanHandle(string key) => _steps.ContainsKey(key);
 
     public TSelf Register(TStep step)
     {
-        _steps[step.RequestType] = step;
+        _steps[step.RequestType.Name] = step;
         return (TSelf)this;
     }
 
@@ -26,7 +26,7 @@ public abstract class Target<TSelf, TStep>
 
     protected TStep GetStep<TResponse>(WorkflowRequest<TResponse> request)
     {
-        if (!_steps.TryGetValue(request.GetType(), out var step))
+        if (!_steps.TryGetValue(request.GetType().Name, out var step))
             throw new InvalidOperationException(
                 $"No step registered for '{request.GetType().Name}'.");
         return step;

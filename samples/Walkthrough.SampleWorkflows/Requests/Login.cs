@@ -6,9 +6,8 @@ namespace Walkthrough.SampleWorkflows;
 
 public record LoginResponse(string Token, string UserId);
 
-public record LoginRequest() : WorkflowRequest<LoginResponse, LoginRequest>, IWorkflowRequest
+public record LoginRequest() : WorkflowRequest<LoginResponse>
 {
-    public static string StepName => "login";
     public IFieldValue<string> Username { get; init; } = Generated(() => $"user-{Guid.NewGuid():N}@test.com");
     public IFieldValue<string> Password { get; init; } = Static("Password123!");
 }

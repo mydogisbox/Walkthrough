@@ -16,10 +16,9 @@ public record AddOrderItem() : BuildableRequest<AddOrderItemResponse>
     public IFieldValue<decimal> UnitPrice   { get; init; } = Static(9.99m);
 }
 
-public record CreateOrderRequest() : WorkflowRequest<OrderResponse, CreateOrderRequest>, IWorkflowRequest
+public record CreateOrderRequest() : WorkflowRequest<OrderResponse>
 {
-    public static string StepName => "createOrder";
-    public IFieldValue<string>       UserId { get; init; } = From(ctx => ctx.Get<UserResponse>("createUser").Id);
+    public IFieldValue<string>       UserId { get; init; } = From(ctx => ctx.Get<UserResponse>("CreateUserRequest").Id);
     public IFieldValue<List<object>> Items  { get; init; } = From(ctx => ctx.GetAccumulated<AddOrderItem>());
 }
 
@@ -29,10 +28,9 @@ public class CreateOrderStep : HttpStep<CreateOrderRequest, OrderResponse, Creat
     public static string     Path   => "/orders";
 }
 
-public record GetOrderRequest() : WorkflowRequest<OrderResponse, GetOrderRequest>, IWorkflowRequest
+public record GetOrderRequest() : WorkflowRequest<OrderResponse>
 {
-    public static string StepName => "getOrder";
-    public IFieldValue<string> OrderId { get; init; } = From(ctx => ctx.Get<OrderResponse>("createOrder").Id);
+    public IFieldValue<string> OrderId { get; init; } = From(ctx => ctx.Get<OrderResponse>("CreateOrderRequest").Id);
 }
 
 public class GetOrderStep : HttpStep<GetOrderRequest, OrderResponse, GetOrderStep>, IHttpStep
@@ -89,10 +87,9 @@ public record DigitalLineItem() : BuildableRequest<DigitalLineItemResponse>
     public IFieldValue<string>  DownloadUrl { get; init; } = Static("https://example.com/ebook");
 }
 
-public record TypeMappedOrderRequest() : WorkflowRequest<OrderResponse, TypeMappedOrderRequest>, IWorkflowRequest
+public record TypeMappedOrderRequest() : WorkflowRequest<OrderResponse>
 {
-    public static string StepName => "typeMappedOrder";
-    public IFieldValue<string>       UserId { get; init; } = From(ctx => ctx.Get<UserResponse>("createUser").Id);
+    public IFieldValue<string>       UserId { get; init; } = From(ctx => ctx.Get<UserResponse>("CreateUserRequest").Id);
     public IFieldValue<List<object>> Items  { get; init; } = From(ctx => ctx.GetAccumulated<LineItem>());
 }
 

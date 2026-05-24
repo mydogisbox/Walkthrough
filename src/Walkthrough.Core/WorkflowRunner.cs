@@ -10,7 +10,6 @@ public class WorkflowRunner
 {
     private readonly WorkflowContext _context;
     private readonly Func<string, ITarget>? _resolver;
-    private readonly ITarget[]? _targets;
 
     private static readonly JsonSerializerOptions _jsonOptions =
         new() { PropertyNameCaseInsensitive = true };
@@ -19,7 +18,8 @@ public class WorkflowRunner
     public WorkflowRunner(WorkflowContext context, params ITarget[] targets)
     {
         _context = context;
-        _targets = targets;
+        _resolver = key => Array.Find(targets, t => t.CanHandle(key))
+            ?? throw new WorkflowContextException($"No target can handle '{key}'.");
     }
 
     /// <summary>Routes each step to the target returned by the resolver.</summary>
@@ -38,14 +38,13 @@ public class WorkflowRunner
     /// <summary>
     /// Executes a request against the resolved target, captures the response, and returns it.
     /// </summary>
-    public async Task<TResponse> ExecuteAsync<TResponse, TSelf>(WorkflowRequest<TResponse, TSelf> request)
-        where TSelf : WorkflowRequest<TResponse, TSelf>, IWorkflowRequest
+    public async Task<TResponse> ExecuteAsync<TResponse>(WorkflowRequest<TResponse> request)
     {
-        var stepName       = TSelf.StepName;
-        var target         = Resolve(stepName, request.GetType());
+        var key            = request.GetType().Name;
+        var target         = Resolve(key);
         var resolvedFields = FieldValueResolver.Resolve(request, _context);
         var response       = await target.ExecuteAsync(request, resolvedFields, _context);
-        _context.CaptureRaw(stepName, response!);
+        _context.CaptureRaw(key, response!);
         return response;
     }
 
@@ -53,30 +52,24 @@ public class WorkflowRunner
     /// Executes a request without throwing on failure, captures the result, and returns it as object.
     /// The caller casts to the expected type. Requires the target to implement IRawTarget.
     /// </summary>
-    public async Task<object> ExecuteRawAsync<TResponse, TSelf>(WorkflowRequest<TResponse, TSelf> request)
-        where TSelf : WorkflowRequest<TResponse, TSelf>, IWorkflowRequest
+    public async Task<object> ExecuteRawAsync<TResponse>(WorkflowRequest<TResponse> request)
     {
-        var stepName = TSelf.StepName;
-        var target   = Resolve(stepName, request.GetType());
+        var key    = request.GetType().Name;
+        var target = Resolve(key);
         if (target is not IRawTarget rawTarget)
             throw new WorkflowContextException(
-                $"Target for step '{stepName}' does not implement IRawTarget.");
+                $"Target for '{key}' does not implement IRawTarget.");
 
         var resolvedFields = FieldValueResolver.Resolve(request, _context);
         var result         = await rawTarget.ExecuteRawAsync(request, resolvedFields, _context);
-        _context.CaptureRaw(stepName, result);
+        _context.CaptureRaw(key, result);
         return result;
     }
 
-    private ITarget Resolve(string stepName, Type requestType)
+    private ITarget Resolve(string key)
     {
-        if (_targets is not null)
-            return Array.Find(_targets, t => t.CanHandle(requestType))
-                ?? throw new WorkflowContextException(
-                    $"No target can handle '{requestType.Name}'.");
-
         if (_resolver is not null)
-            return _resolver(stepName);
+            return _resolver(key);
 
         throw new WorkflowContextException(
             "No target resolver registered. Provide targets or a resolver when constructing WorkflowRunner.");
@@ -86,12 +79,11 @@ public class WorkflowRunner
     /// Repeatedly executes a request until <paramref name="until"/> returns true
     /// or <paramref name="timeoutMs"/> elapses, with <paramref name="intervalMs"/> between attempts.
     /// </summary>
-    public async Task<TResponse> PollAsync<TResponse, TSelf>(
-        WorkflowRequest<TResponse, TSelf> request,
+    public async Task<TResponse> PollAsync<TResponse>(
+        WorkflowRequest<TResponse> request,
         Func<TResponse, bool> until,
         int intervalMs = 500,
         int timeoutMs  = 10000)
-        where TSelf : WorkflowRequest<TResponse, TSelf>, IWorkflowRequest
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
@@ -104,7 +96,7 @@ public class WorkflowRunner
 
             if (remaining <= 0)
                 throw new WorkflowContextException(
-                    $"PollAsync timed out after {timeoutMs}ms waiting for step '{TSelf.StepName}'.");
+                    $"PollAsync timed out after {timeoutMs}ms waiting for '{request.GetType().Name}'.");
 
             await Task.Delay((int)Math.Min(intervalMs, remaining));
         }

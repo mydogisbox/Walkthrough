@@ -12,9 +12,8 @@ namespace Walkthrough.UnitTests;
 public class WorkflowContextPollTests
 {
     private record StatusResponse(string Status);
-    private record GetStatusRequest() : WorkflowRequest<StatusResponse, GetStatusRequest>, IWorkflowRequest
+    private record GetStatusRequest() : WorkflowRequest<StatusResponse>
     {
-        public static string StepName => "getStatus";
     }
 
     private class FakeTarget : ITarget
@@ -22,7 +21,7 @@ public class WorkflowContextPollTests
         private readonly Queue<object> _responses = new();
         public int CallCount { get; private set; }
 
-        public bool CanHandle(Type _) => true;
+        public bool CanHandle(string _) => true;
         public void Enqueue<T>(T response) => _responses.Enqueue(response!);
 
         public Task<TResponse> ExecuteAsync<TResponse>(WorkflowRequest<TResponse> request, Dictionary<string, object?> resolvedFields, WorkflowContext context)
@@ -72,11 +71,11 @@ public class WorkflowContextPollTests
             runner.PollAsync(new GetStatusRequest(), r => r.Status == "Completed",
                 intervalMs: 10, timeoutMs: 50));
 
-        Assert.Contains("getStatus", ex.Message);
+        Assert.Contains("GetStatusRequest", ex.Message);
     }
 
     [Fact]
-    public async Task CapturesFinalResponse_UnderStepName()
+    public async Task CapturesFinalResponse_UnderTypeName()
     {
         var fake = new FakeTarget();
         fake.Enqueue(new StatusResponse("Pending"));
@@ -86,7 +85,7 @@ public class WorkflowContextPollTests
         var runner  = new WorkflowRunner(context, _ => fake);
         await runner.PollAsync(new GetStatusRequest(), r => r.Status == "Completed", intervalMs: 1);
 
-        Assert.Equal("Completed", context.Get<StatusResponse>("getStatus").Status);
+        Assert.Equal("Completed", context.Get<StatusResponse>("GetStatusRequest").Status);
     }
 }
 

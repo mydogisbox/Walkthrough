@@ -6,9 +6,8 @@ namespace Walkthrough.SampleWorkflows;
 
 public record UserResponse(string Id, string Email, string FirstName, string LastName, string Role);
 
-public record CreateUserRequest() : WorkflowRequest<UserResponse, CreateUserRequest>, IWorkflowRequest
+public record CreateUserRequest() : WorkflowRequest<UserResponse>
 {
-    public static string StepName => "createUser";
     public IFieldValue<string> Email     { get; init; } = Generated(() => $"user-{Guid.NewGuid():N}@test.com");
     public IFieldValue<string> FirstName { get; init; } = Static("Test");
     public IFieldValue<string> LastName  { get; init; } = Static("User");
@@ -52,10 +51,9 @@ public record ContactFields
     public IFieldValue<PrimaryFields> Primary { get; init; } = Static(new PrimaryFields());
 }
 
-public record UpdateUserAddressRequest() : WorkflowRequest<UpdateUserAddressResponse, UpdateUserAddressRequest>, IWorkflowRequest
+public record UpdateUserAddressRequest() : WorkflowRequest<UpdateUserAddressResponse>
 {
-    public static string StepName => "updateUserAddress";
-    public IFieldValue<string>        UserId  { get; init; } = From(ctx => ctx.Get<UserResponse>("createUser").Id);
+    public IFieldValue<string>        UserId  { get; init; } = From(ctx => ctx.Get<UserResponse>("CreateUserRequest").Id);
     public IFieldValue<ContactFields> Contact { get; init; } = Static(new ContactFields());
 }
 
@@ -67,9 +65,8 @@ public class UpdateUserAddressStep : HttpStep<UpdateUserAddressRequest, UpdateUs
 
 // --- GetUsersByRole ---
 
-public record GetUsersByRoleRequest() : WorkflowRequest<List<UserResponse>, GetUsersByRoleRequest>, IWorkflowRequest
+public record GetUsersByRoleRequest() : WorkflowRequest<List<UserResponse>>
 {
-    public static string StepName => "getUsersByRole";
     public IFieldValue<string> Role { get; init; } = Static("user");
 }
 
