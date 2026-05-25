@@ -10,7 +10,7 @@ public abstract class Target<TSelf, TStep>
 {
     protected readonly Dictionary<string, TStep> _steps = new(StringComparer.OrdinalIgnoreCase);
 
-    public bool CanHandle(string key) => _steps.ContainsKey(key);
+    public virtual bool CanHandle(string key) => _steps.ContainsKey(key);
 
     public TSelf Register(TStep step)
     {

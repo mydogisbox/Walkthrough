@@ -8,12 +8,12 @@ namespace Walkthrough.Http;
 /// </summary>
 public class HttpTarget : Target<HttpTarget, HttpStep>, ITarget, IRawTarget
 {
-    private readonly string _baseUrl;
+    protected readonly HttpExecutor Executor;
     private IReadOnlyDictionary<string, IFieldValue<string>> _headers = new Dictionary<string, IFieldValue<string>>();
 
     public HttpTarget(string baseUrl)
     {
-        _baseUrl = baseUrl.TrimEnd('/');
+        Executor = new HttpExecutor(baseUrl);
     }
 
     /// <summary>Sets the headers sent with every request.</summary>
@@ -27,13 +27,13 @@ public class HttpTarget : Target<HttpTarget, HttpStep>, ITarget, IRawTarget
     {
         var step          = GetStep(request);
         var targetHeaders = FieldValueResolver.ResolveGroup(_headers, context);
-        return ((IHttpStep<TResponse>)step).RunAsync(_baseUrl, resolvedFields, targetHeaders);
+        return ((IHttpStep<TResponse>)step).RunAsync(Executor, resolvedFields, targetHeaders);
     }
 
     Task<object> IRawTarget.ExecuteRawAsync<TResponse>(WorkflowRequest<TResponse> request, Dictionary<string, object?> resolvedFields, WorkflowContext context)
     {
         var step          = GetStep(request);
         var targetHeaders = FieldValueResolver.ResolveGroup(_headers, context);
-        return ((IHttpStep<TResponse>)step).RunRawAsync(_baseUrl, resolvedFields, targetHeaders);
+        return ((IHttpStep<TResponse>)step).RunRawAsync(Executor, resolvedFields, targetHeaders);
     }
 }

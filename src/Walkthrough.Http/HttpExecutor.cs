@@ -1,15 +1,14 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Walkthrough.Core;
 
 namespace Walkthrough.Http;
 
 /// <summary>
-/// Shared HTTP execution logic used by both HttpTarget (C# path)
-/// and JsonWorkflowRunner (JSON path).
+/// HTTP transport bound to a base URL. Handles request construction, sending, and response reading.
+/// Static helpers (Deserialize, serialization options) remain available without an instance.
 /// </summary>
-public static class HttpExecutor
+public class HttpExecutor
 {
     public static readonly JsonSerializerOptions SerializeOptions = new()
     {
@@ -24,8 +23,53 @@ public static class HttpExecutor
     private static readonly HttpClient SharedClient =
         new(new HttpClientHandler { AllowAutoRedirect = false });
 
-    private static async Task<HttpResponseMessage> SendCoreAsync(
-        string baseUrl,
+    private readonly string _baseUrl;
+
+    public HttpExecutor(string baseUrl) => _baseUrl = baseUrl.TrimEnd('/');
+
+    public async Task<string> SendAsync(
+        HttpMethod method,
+        string path,
+        Dictionary<string, object?> pathParams,
+        Dictionary<string, string> queryParams,
+        Dictionary<string, object?> bodyFields,
+        Dictionary<string, string> headers)
+    {
+        var response = await SendCoreAsync(method, path, pathParams, queryParams, bodyFields, headers);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            var url = response.RequestMessage!.RequestUri;
+            var locationHint = response.Headers.Location is { } loc
+                ? $" Redirect location: {loc}."
+                : string.Empty;
+            throw new HttpStepException(
+                $"HTTP {method} {url} failed with {(int)response.StatusCode} ({response.StatusCode})." +
+                $"{locationHint} Body: {body}");
+        }
+
+        return await response.Content.ReadAsStringAsync();
+    }
+
+    public async Task<(int StatusCode, string Body)> SendRawAsync(
+        HttpMethod method,
+        string path,
+        Dictionary<string, object?> pathParams,
+        Dictionary<string, string> queryParams,
+        Dictionary<string, object?> bodyFields,
+        Dictionary<string, string> headers)
+    {
+        var response = await SendCoreAsync(method, path, pathParams, queryParams, bodyFields, headers);
+        var body = await response.Content.ReadAsStringAsync();
+        return ((int)response.StatusCode, body);
+    }
+
+    public static T Deserialize<T>(string json) =>
+        JsonSerializer.Deserialize<T>(json, DeserializeOptions)
+            ?? throw new HttpStepException($"Response deserialized to null for type '{typeof(T).Name}'.");
+
+    private async Task<HttpResponseMessage> SendCoreAsync(
         HttpMethod method,
         string path,
         Dictionary<string, object?> pathParams,
@@ -44,7 +88,7 @@ public static class HttpExecutor
             path = path.TrimEnd('?', '&') + (path.Contains('?') ? "&" : "?") + qs;
         }
 
-        var url = baseUrl.TrimEnd('/') + "/" + path.TrimStart('/');
+        var url = _baseUrl + "/" + path.TrimStart('/');
         var httpRequest = new HttpRequestMessage(method, url);
 
         if (method != HttpMethod.Get && method != HttpMethod.Delete && bodyFields.Count > 0)
@@ -58,62 +102,4 @@ public static class HttpExecutor
 
         return await SharedClient.SendAsync(httpRequest);
     }
-
-    /// <summary>
-    /// Executes an HTTP request, returning the raw response body.
-    /// </summary>
-    /// <param name="baseUrl">Target base URL.</param>
-    /// <param name="method">HTTP method.</param>
-    /// <param name="path">Path template; <c>{placeholder}</c> segments are substituted from <paramref name="pathParams"/>.</param>
-    /// <param name="pathParams">Values substituted into <c>{placeholder}</c> segments of <paramref name="path"/>. Never sent in the body.</param>
-    /// <param name="queryParams">Key-value pairs appended to the URL as a query string.</param>
-    /// <param name="bodyFields">Fields serialized as the JSON request body (ignored for GET and DELETE).</param>
-    /// <param name="headers">HTTP headers sent with the request.</param>
-    public static async Task<string> SendAsync(
-        string baseUrl,
-        HttpMethod method,
-        string path,
-        Dictionary<string, object?> pathParams,
-        Dictionary<string, string> queryParams,
-        Dictionary<string, object?> bodyFields,
-        Dictionary<string, string> headers)
-    {
-        var response = await SendCoreAsync(baseUrl, method, path, pathParams, queryParams, bodyFields, headers);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            var body = await response.Content.ReadAsStringAsync();
-            var url = response.RequestMessage!.RequestUri;
-            var locationHint = response.Headers.Location is { } loc
-                ? $" Redirect location: {loc}."
-                : string.Empty;
-            throw new HttpStepException(
-                $"HTTP {method} {url} failed with {(int)response.StatusCode} ({response.StatusCode})." +
-                $"{locationHint} Body: {body}");
-        }
-
-        return await response.Content.ReadAsStringAsync();
-    }
-
-    /// <summary>
-    /// Executes an HTTP request, returning the status code and body regardless of success or failure.
-    /// Never throws on non-2xx responses.
-    /// </summary>
-    public static async Task<(int StatusCode, string Body)> SendRawAsync(
-        string baseUrl,
-        HttpMethod method,
-        string path,
-        Dictionary<string, object?> pathParams,
-        Dictionary<string, string> queryParams,
-        Dictionary<string, object?> bodyFields,
-        Dictionary<string, string> headers)
-    {
-        var response = await SendCoreAsync(baseUrl, method, path, pathParams, queryParams, bodyFields, headers);
-        var body = await response.Content.ReadAsStringAsync();
-        return ((int)response.StatusCode, body);
-    }
-
-    public static T Deserialize<T>(string json) =>
-        JsonSerializer.Deserialize<T>(json, DeserializeOptions)
-            ?? throw new HttpStepException($"Response deserialized to null for type '{typeof(T).Name}'.");
 }

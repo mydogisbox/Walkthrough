@@ -11,8 +11,8 @@ public interface IHttpStep
 
 public interface IHttpStep<TResponse>
 {
-    Task<TResponse> RunAsync(string baseUrl, Dictionary<string, object?> resolvedFields, Dictionary<string, string> targetHeaders);
-    Task<object>   RunRawAsync(string baseUrl, Dictionary<string, object?> resolvedFields, Dictionary<string, string> targetHeaders);
+    Task<TResponse> RunAsync(HttpExecutor executor, Dictionary<string, object?> resolvedFields, Dictionary<string, string> targetHeaders);
+    Task<object>   RunRawAsync(HttpExecutor executor, Dictionary<string, object?> resolvedFields, Dictionary<string, string> targetHeaders);
 }
 
 public abstract class HttpStep : IStep
@@ -36,22 +36,22 @@ public abstract class HttpStep<TRequest, TResponse, TSelf> : HttpStep, IHttpStep
     public override Type RequestType => typeof(TRequest);
 
     async Task<TResponse> IHttpStep<TResponse>.RunAsync(
-        string baseUrl,
+        HttpExecutor executor,
         Dictionary<string, object?> resolvedFields,
         Dictionary<string, string> targetHeaders)
     {
         var (pathParams, query, headers, body) = PrepareRequest(resolvedFields, targetHeaders);
-        var json = await HttpExecutor.SendAsync(baseUrl, TSelf.Method, TSelf.Path, pathParams, query, body, headers);
+        var json = await executor.SendAsync(TSelf.Method, TSelf.Path, pathParams, query, body, headers);
         return HttpExecutor.Deserialize<TResponse>(json);
     }
 
     async Task<object> IHttpStep<TResponse>.RunRawAsync(
-        string baseUrl,
+        HttpExecutor executor,
         Dictionary<string, object?> resolvedFields,
         Dictionary<string, string> targetHeaders)
     {
         var (pathParams, query, headers, body) = PrepareRequest(resolvedFields, targetHeaders);
-        var (statusCode, json) = await HttpExecutor.SendRawAsync(baseUrl, TSelf.Method, TSelf.Path, pathParams, query, body, headers);
+        var (statusCode, json) = await executor.SendRawAsync(TSelf.Method, TSelf.Path, pathParams, query, body, headers);
         object? responseBody;
         try   { responseBody = string.IsNullOrEmpty(json) ? null : HttpExecutor.Deserialize<TResponse>(json); }
         catch { responseBody = json; }

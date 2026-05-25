@@ -4,16 +4,19 @@ using Walkthrough.Http;
 namespace Walkthrough.Json;
 
 /// <summary>
-/// Executes workflow steps over HTTP using <see cref="HttpExecutor"/>.
-/// Constructed from a <see cref="TargetDefinition"/> (JSON config).
+/// An <see cref="HttpTarget"/> constructed from a <see cref="TargetDefinition"/> (JSON config)
+/// rather than registered C# step classes. Adds untyped execution for the JSON workflow runner.
 /// </summary>
-public class JsonHttpTarget
+public class JsonHttpTarget : HttpTarget
 {
     private readonly TargetDefinition _definition;
 
-    public JsonHttpTarget(TargetDefinition definition) => _definition = definition;
+    public JsonHttpTarget(TargetDefinition definition) : base(definition.BaseUrl)
+    {
+        _definition = definition;
+    }
 
-    public bool CanHandle(string stepName) => _definition.Steps?.ContainsKey(stepName) == true;
+    public override bool CanHandle(string key) => _definition.Steps?.ContainsKey(key) == true;
 
     public IEnumerable<string> StepNames => _definition.Steps?.Keys ?? Enumerable.Empty<string>();
 
@@ -29,8 +32,8 @@ public class JsonHttpTarget
         var (pathParams, queryParams, headers) = ResolveTransportParams(step, pathParamOverrides, queryOverrides, headerOverrides, captures);
         var method = new HttpMethod(step.Method.ToUpper());
 
-        var responseJson = await HttpExecutor.SendAsync(
-            _definition.BaseUrl, method, step.Path, pathParams, queryParams, bodyFields, headers);
+        var responseJson = await Executor.SendAsync(
+            method, step.Path, pathParams, queryParams, bodyFields, headers);
 
         return ParseJsonResponse(responseJson);
     }
@@ -47,8 +50,8 @@ public class JsonHttpTarget
         var (pathParams, queryParams, headers) = ResolveTransportParams(step, pathParamOverrides, queryOverrides, headerOverrides, captures);
         var method = new HttpMethod(step.Method.ToUpper());
 
-        var (statusCode, rawBody) = await HttpExecutor.SendRawAsync(
-            _definition.BaseUrl, method, step.Path, pathParams, queryParams, bodyFields, headers);
+        var (statusCode, rawBody) = await Executor.SendRawAsync(
+            method, step.Path, pathParams, queryParams, bodyFields, headers);
 
         object? parsedBody;
         try { parsedBody = ParseJsonResponse(rawBody); }
