@@ -4,6 +4,8 @@ using System.Text.Json.Serialization;
 
 namespace Walkthrough.Http;
 
+public record HttpSendResult(bool IsSuccess, int StatusCode, string Body, bool IsTransient);
+
 /// <summary>
 /// HTTP transport bound to a base URL. Handles request construction, sending, and response reading.
 /// Static helpers (Deserialize, serialization options) remain available without an instance.
@@ -27,6 +29,28 @@ public class HttpExecutor
 
     public HttpExecutor(string baseUrl) => _baseUrl = baseUrl.TrimEnd('/');
 
+    public async Task<HttpSendResult> TrySendAsync(
+        HttpMethod method,
+        string path,
+        Dictionary<string, object?> pathParams,
+        Dictionary<string, string> queryParams,
+        Dictionary<string, object?> bodyFields,
+        Dictionary<string, string> headers)
+    {
+        try
+        {
+            var response = await SendCoreAsync(method, path, pathParams, queryParams, bodyFields, headers);
+            var body = await response.Content.ReadAsStringAsync();
+            var statusCode = (int)response.StatusCode;
+            var isTransient = statusCode is 503 or 504 or 429 or 404;
+            return new HttpSendResult(response.IsSuccessStatusCode, statusCode, body, isTransient);
+        }
+        catch (HttpRequestException ex)
+        {
+            return new HttpSendResult(false, 0, ex.Message, IsTransient: true);
+        }
+    }
+
     public async Task<string> SendAsync(
         HttpMethod method,
         string path,
@@ -35,21 +59,18 @@ public class HttpExecutor
         Dictionary<string, object?> bodyFields,
         Dictionary<string, string> headers)
     {
-        var response = await SendCoreAsync(method, path, pathParams, queryParams, bodyFields, headers);
+        var result = await TrySendAsync(method, path, pathParams, queryParams, bodyFields, headers);
 
-        if (!response.IsSuccessStatusCode)
+        if (!result.IsSuccess)
         {
-            var body = await response.Content.ReadAsStringAsync();
-            var url = response.RequestMessage!.RequestUri;
-            var locationHint = response.Headers.Location is { } loc
-                ? $" Redirect location: {loc}."
-                : string.Empty;
+            if (result.StatusCode == 0)
+                throw new HttpRequestException(result.Body);
             throw new HttpStepException(
-                $"HTTP {method} {url} failed with {(int)response.StatusCode} ({response.StatusCode})." +
-                $"{locationHint} Body: {body}");
+                $"HTTP {method} {_baseUrl}/{path.TrimStart('/')} failed with {result.StatusCode}. Body: {result.Body}",
+                result.StatusCode);
         }
 
-        return await response.Content.ReadAsStringAsync();
+        return result.Body;
     }
 
     public async Task<(int StatusCode, string Body)> SendRawAsync(
@@ -60,9 +81,8 @@ public class HttpExecutor
         Dictionary<string, object?> bodyFields,
         Dictionary<string, string> headers)
     {
-        var response = await SendCoreAsync(method, path, pathParams, queryParams, bodyFields, headers);
-        var body = await response.Content.ReadAsStringAsync();
-        return ((int)response.StatusCode, body);
+        var result = await TrySendAsync(method, path, pathParams, queryParams, bodyFields, headers);
+        return (result.StatusCode, result.Body);
     }
 
     public static T Deserialize<T>(string json) =>

@@ -239,14 +239,17 @@ public class JsonWorkflowRunner
             return new StepResult(fullResponseKey, bodyFields, fullResponse);
         }
 
-        var captured = await target.ExecuteAsync(
+        var (response, error) = await target.ExecuteAsync(
             stepName, bodyFields,
             invocation.PathParams, invocation.Query, invocation.Headers, captures);
 
-        var captureName = invocation.CaptureAs ?? stepName;
-        captures[captureName] = captured;
+        if (error is not null)
+            throw new JsonWorkflowException(error.Message);
 
-        return new StepResult(captureName, bodyFields, captured);
+        var captureName = invocation.CaptureAs ?? stepName;
+        captures[captureName] = response;
+
+        return new StepResult(captureName, bodyFields, response);
     }
 
     private static StepResult BuildItem(
@@ -286,15 +289,34 @@ public class JsonWorkflowRunner
         Dictionary<string, object?> captures)
     {
         var stepName = invocation.Poll!;
-        var executeInvocation = new StepInvocation { Step = stepName, CaptureAs = invocation.CaptureAs, With = invocation.With, Headers = invocation.Headers };
+
+        contracts.TryGetValue(stepName, out var contract);
+
+        var target = targets.FirstOrDefault(t => t.CanHandle(stepName))
+            ?? throw new JsonWorkflowException(
+                $"Step '{stepName}' not found in any loaded target. " +
+                $"Loaded targets cover: [{string.Join(", ", targets.SelectMany(t => t.StepNames))}]");
+
+        var bodyFields = MergeAndResolve(contract?.Defaults, invocation.With, captures);
+        var captureName = invocation.CaptureAs ?? stepName;
         var deadline = DateTime.UtcNow.AddMilliseconds(invocation.TimeoutMs);
 
         while (true)
         {
-            var result = await ExecuteStepAsync(executeInvocation, contracts, targets, captures);
+            var (response, error) = await target.ExecuteAsync(
+                stepName, bodyFields,
+                invocation.PathParams, invocation.Query, invocation.Headers, captures);
 
-            if (invocation.Until is null || EvaluateAssertions([invocation.Until], captures).Count == 0)
-                return result;
+            if (error is { IsTransient: false })
+                throw new JsonWorkflowException(error.Message);
+
+            if (error is null)
+            {
+                captures[captureName] = response;
+
+                if (invocation.Until is null || EvaluateAssertions([invocation.Until], captures).Count == 0)
+                    return new StepResult(captureName, bodyFields, response);
+            }
 
             var remaining = deadline - DateTime.UtcNow;
             if (remaining <= TimeSpan.Zero)

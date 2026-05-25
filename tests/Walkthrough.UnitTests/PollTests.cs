@@ -112,6 +112,9 @@ public class JsonWorkflowRunnerPollTests : IDisposable
     public void Dispose() => _listener.Stop();
 
     private void ServeSequence(params string[] responses)
+        => ServeStatusSequence(responses.Select(r => (200, r)).ToArray());
+
+    private void ServeStatusSequence(params (int StatusCode, string Body)[] responses)
     {
         _ = Task.Run(async () =>
         {
@@ -122,7 +125,9 @@ public class JsonWorkflowRunnerPollTests : IDisposable
                 catch { break; }
 
                 var idx = Math.Min(_callCount[0]++, responses.Length - 1);
-                var bytes = System.Text.Encoding.UTF8.GetBytes(responses[idx]);
+                var (statusCode, body) = responses[idx];
+                var bytes = System.Text.Encoding.UTF8.GetBytes(body);
+                ctx.Response.StatusCode = statusCode;
                 ctx.Response.ContentType = "application/json";
                 ctx.Response.ContentLength64 = bytes.Length;
                 await ctx.Response.OutputStream.WriteAsync(bytes);
@@ -230,6 +235,111 @@ public class JsonWorkflowRunnerPollTests : IDisposable
 
         Assert.True(result.Passed);
         Assert.Empty(result.AssertionErrors);
+    }
+    [Fact]
+    public async Task Poll_RetriesOnTransient503_ThenSucceeds()
+    {
+        ServeStatusSequence(
+            (503, "\"Service Unavailable\""),
+            (503, "\"Service Unavailable\""),
+            (200, "{\"status\":\"Completed\"}"));
+
+        var (workflow, contracts, targets) = BuildWorkflow(new StepInvocation
+        {
+            Poll = "getStatus",
+            Until = new AssertionDefinition { Equal = ["$getStatus.status", "Completed"] },
+            IntervalMs = 1,
+            TimeoutMs = 5000
+        });
+
+        var result = await JsonWorkflowRunner.RunAsync(workflow, contracts, targets);
+
+        Assert.True(result.Passed);
+        Assert.Equal(3, _callCount[0]);
+    }
+
+    [Fact]
+    public async Task Poll_RetriesOnTransient429_ThenSucceeds()
+    {
+        ServeStatusSequence(
+            (429, "\"Too Many Requests\""),
+            (200, "{\"status\":\"Done\"}"));
+
+        var (workflow, contracts, targets) = BuildWorkflow(new StepInvocation
+        {
+            Poll = "getStatus",
+            IntervalMs = 1,
+            TimeoutMs = 5000
+        });
+
+        var result = await JsonWorkflowRunner.RunAsync(workflow, contracts, targets);
+
+        Assert.True(result.Passed);
+        Assert.Equal(2, _callCount[0]);
+    }
+
+    [Fact]
+    public async Task Poll_FailsImmediatelyOnNonTransient400()
+    {
+        ServeStatusSequence(
+            (400, "{\"error\":\"Bad Request\"}"));
+
+        var (workflow, contracts, targets) = BuildWorkflow(new StepInvocation
+        {
+            Poll = "getStatus",
+            Until = new AssertionDefinition { Equal = ["$getStatus.status", "Completed"] },
+            IntervalMs = 1,
+            TimeoutMs = 5000
+        });
+
+        var ex = await Assert.ThrowsAsync<JsonWorkflowException>(() =>
+            JsonWorkflowRunner.RunAsync(workflow, contracts, targets));
+
+        Assert.Contains("400", ex.Message);
+        Assert.Equal(1, _callCount[0]);
+    }
+
+    [Fact]
+    public async Task Poll_RetriesOnTransient404_ThenSucceeds()
+    {
+        ServeStatusSequence(
+            (404, "{\"error\":\"Not Found\"}"),
+            (404, "{\"error\":\"Not Found\"}"),
+            (200, "{\"status\":\"Ready\"}"));
+
+        var (workflow, contracts, targets) = BuildWorkflow(new StepInvocation
+        {
+            Poll = "getStatus",
+            Until = new AssertionDefinition { Equal = ["$getStatus.status", "Ready"] },
+            IntervalMs = 1,
+            TimeoutMs = 5000
+        });
+
+        var result = await JsonWorkflowRunner.RunAsync(workflow, contracts, targets);
+
+        Assert.True(result.Passed);
+        Assert.Equal(3, _callCount[0]);
+    }
+
+    [Fact]
+    public async Task Poll_TimesOutIfTransientErrorsPersist()
+    {
+        ServeStatusSequence(
+            (503, "\"Service Unavailable\""));
+
+        var (workflow, contracts, targets) = BuildWorkflow(new StepInvocation
+        {
+            Poll = "getStatus",
+            Until = new AssertionDefinition { Equal = ["$getStatus.status", "Completed"] },
+            IntervalMs = 10,
+            TimeoutMs = 200
+        });
+
+        var ex = await Assert.ThrowsAsync<JsonWorkflowException>(() =>
+            JsonWorkflowRunner.RunAsync(workflow, contracts, targets));
+
+        Assert.Contains("timed out", ex.Message);
+        Assert.True(_callCount[0] > 1);
     }
 }
 

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Walkthrough.Core;
 using Walkthrough.Http;
 
 namespace Walkthrough.Json;
@@ -20,7 +21,7 @@ public class JsonHttpTarget : HttpTarget
 
     public IEnumerable<string> StepNames => _definition.Steps?.Keys ?? Enumerable.Empty<string>();
 
-    public async Task<object?> ExecuteAsync(
+    public async Task<(object? Response, StepError? Error)> ExecuteAsync(
         string stepName,
         Dictionary<string, object?> bodyFields,
         Dictionary<string, FieldValueDefinition>? pathParamOverrides,
@@ -32,10 +33,15 @@ public class JsonHttpTarget : HttpTarget
         var (pathParams, queryParams, headers) = ResolveTransportParams(step, pathParamOverrides, queryOverrides, headerOverrides, captures);
         var method = new HttpMethod(step.Method.ToUpper());
 
-        var responseJson = await Executor.SendAsync(
+        var result = await Executor.TrySendAsync(
             method, step.Path, pathParams, queryParams, bodyFields, headers);
 
-        return ParseJsonResponse(responseJson);
+        if (!result.IsSuccess)
+            return (null, new StepError(
+                $"HTTP {method} {step.Path} failed with {result.StatusCode}. Body: {result.Body}",
+                result.IsTransient));
+
+        return (ParseJsonResponse(result.Body), null);
     }
 
     public async Task<object?> ExecuteRawAsync(
