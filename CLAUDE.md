@@ -15,13 +15,12 @@ Run tests after every change to verify nothing is broken.
 ```
 Walkthrough.Core
 ├── WorkflowRequest<TResponse>          — transport-agnostic base record; base type used by ITarget
-├── WorkflowRequest<TResponse, TSelf>   — CRTP middle layer; TSelf : IWorkflowRequest gives access to static StepName
-├── IWorkflowRequest                    — static abstract StepName { get; }; implemented by every concrete request
 ├── BuildableRequest                    — non-generic marker base for array item builders
 ├── BuildableRequest<TResponse>         — generic base; TResponse is the resolved snapshot type returned by BuildAsync
 ├── WorkflowContext                     — pure state bag: captures and accumulations only; no execution logic
-├── ITarget                             — execute a request against a target; implemented by HttpTarget or any custom class
-├── WorkflowRunner                      — orchestrates execution: ExecuteAsync, PollAsync, BuildAsync
+├── ITarget                             — execute a request against a target; CanHandle(string key) for dispatch
+├── WorkflowRunner                      — routes to targets, captures responses, orchestrates polling and building
+├── StepError                           — transport-agnostic error: Message + IsTransient
 ├── IFieldValue<T>                      — interface for resolvable field values
 ├── FieldValues                         — Static(), Generated(), From() factories
 ├── FieldValueResolver                  — reflection-based resolver
@@ -29,7 +28,9 @@ Walkthrough.Core
 
 Walkthrough.Http
 ├── HttpTarget : ITarget                — sends requests over HTTP; steps registered via Register<TStep>()
-├── HttpExecutor                        — shared HTTP send/deserialize logic
+├── HttpExecutor                        — instance-based HTTP transport bound to a base URL; TrySendAsync (non-throwing) / SendAsync / SendRawAsync
+├── HttpSendResult                      — IsSuccess, StatusCode, Body, IsTransient (503/504/429/404 + network errors)
+├── HttpStepException                   — thrown by SendAsync on failure; carries StatusCode
 ├── HttpStep                            — abstract base; internal constructor prevents direct external subclassing
 ├── IHttpStep                           — static abstract Method and Path; declared on every concrete step class
 ├── IHttpStep<TResponse>                — RunAsync / RunRawAsync dispatch interface; implemented by HttpStep<,,>
@@ -37,10 +38,11 @@ Walkthrough.Http
 
 Walkthrough.Json
 ├── JsonWorkflowRunner             — pure engine: step execution, path resolution, assertion evaluation
+├── JsonHttpTarget : HttpTarget    — untyped execution from TargetDefinition (JSON config); ExecuteAsync returns (Response, StepError?)
 ├── JsonWorkflowTestBase           — thin xUnit wrapper over the runner
 ├── WorkflowDefinition             — all JSON model types
 ├── WorkflowResult                 — WorkflowName, Passed, Steps, AssertionErrors, Captures; ThrowIfFailed()
-└── StepResult                     — StepName, Request (resolved payload; null for build steps), Response
+├── StepResult                     — StepName, Request (resolved payload; null for build steps), Response
 └── JsonValueResolver              — FromJsonValue, JsonElementToObject, field value types
 ```
 
@@ -86,5 +88,6 @@ The published Claude guidance lives in `docs/claude/` and is copied into consumi
 - `docs/claude/claude.md` — consumer entrypoint: library overview and philosophy
 - `docs/claude/csharp-style.md` — fluent C# API patterns (WorkflowRunner, HttpTarget, request/step types, field values)
 - `docs/claude/json-style.md` — JSON workflow and contract patterns, including JsonWorkflowRunner and its result types
+- `docs/claude/upgrade-0.5-to-0.6.md` — migration guide (0.5 → 0.6): IWorkflowRequest removal, type-name captures
 - `docs/claude/upgrade-0.4-to-0.5.md` — migration guide (0.4 → 0.5)
 - `docs/claude/upgrade-0.3-to-0.4.md` — migration guide (0.3 → 0.4)

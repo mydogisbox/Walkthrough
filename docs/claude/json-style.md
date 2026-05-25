@@ -268,6 +268,7 @@ Re-executes a step on an interval until an `until` assertion passes or the timeo
 - `timeoutMs` — max wait before throwing (default: 10000)
 - `captureAs` — works the same as on `step` invocations
 - If `until` is omitted the step executes once and succeeds immediately
+- Transient HTTP errors (503, 504, 429, 404, network failures) are retried automatically within the timeout. Non-transient errors (400, 401, 500, etc.) fail immediately.
 
 ---
 
