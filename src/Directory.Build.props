@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
     <Authors>Michael Ciccotti</Authors>
-    <Version>0.7.1</Version>
+    <Version>0.7.2</Version>
     <PackageProjectUrl>https://github.com/michaelciccotti/walkthrough</PackageProjectUrl>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <IsPackable>true</IsPackable>

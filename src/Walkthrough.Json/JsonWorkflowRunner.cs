@@ -127,13 +127,15 @@ public class JsonWorkflowRunner
         var captures = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         var stepResults = await ExecuteStepsAsync(workflow.Steps, contracts, targets, captures, namedWorkflows ?? new Dictionary<string, WorkflowDefinition>());
 
-        var assertionErrors = workflow.Assertions is not null
+        var hasExecutionError = stepResults.Any(s => s.Error is not null);
+
+        var assertionErrors = !hasExecutionError && workflow.Assertions is not null
             ? EvaluateAssertions(workflow.Assertions, captures)
             : [];
 
         return new WorkflowResult(
             workflow.Name,
-            assertionErrors.Count == 0,
+            !hasExecutionError && assertionErrors.Count == 0,
             stepResults,
             assertionErrors,
             captures);
@@ -184,6 +186,9 @@ public class JsonWorkflowRunner
                 results.AddRange(await ExecuteNestedWorkflowAsync(invocation.Workflow, contracts, targets, captures, namedWorkflows));
             else
                 throw new JsonWorkflowException("Each step must have 'step', 'build', 'poll', or 'workflow'.");
+
+            if (results[^1].Error is not null)
+                break;
         }
         return results;
     }
@@ -244,7 +249,7 @@ public class JsonWorkflowRunner
             invocation.PathParams, invocation.Query, invocation.Headers, captures);
 
         if (error is not null)
-            throw new JsonWorkflowException(error.Message);
+            return new StepResult(invocation.CaptureAs ?? stepName, bodyFields, null, error);
 
         var captureName = invocation.CaptureAs ?? stepName;
         captures[captureName] = response;

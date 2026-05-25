@@ -409,9 +409,9 @@ After this step, `deleteResult.status` is the HTTP status code and `deleteResult
 | Field | Type | Description |
 |-------|------|-------------|
 | `WorkflowName` | `string` | Name of the workflow that ran |
-| `Passed` | `bool` | `true` if all assertions passed |
-| `Steps` | `List<StepResult>` | One entry per executed step, in order |
-| `AssertionErrors` | `List<string>` | Failure messages when `Passed` is `false` |
+| `Passed` | `bool` | `true` if all steps succeeded and all assertions passed |
+| `Steps` | `List<StepResult>` | One entry per executed step, in order; stops at first execution error |
+| `AssertionErrors` | `List<string>` | Failure messages; empty when a step execution error occurred |
 | `Captures` | `Dictionary<string, object?>` | All captured values at end of workflow |
 
 Each `StepResult` entry:
@@ -420,7 +420,33 @@ Each `StepResult` entry:
 |-------|------|-------------|
 | `StepName` | `string` | Capture key for this step (step name or `captureAs`) |
 | `Request` | `object?` | Resolved request payload sent (`Dictionary<string, object?>`); `null` for build steps |
-| `Response` | `object?` | Deserialized response; `Dictionary<string, object?>` for full-response captures |
+| `Response` | `object?` | Deserialized response; `null` when `Error` is set |
+| `Error` | `StepError?` | `null` on success; contains `Message` and `IsTransient` on failure |
+
+### Execution errors vs assertion failures
+
+`RunAsync` never throws on step execution failures — it returns them as structured data:
+
+```csharp
+var result = await JsonWorkflowRunner.RunAsync(workflow, contracts, targets);
+
+if (!result.Passed)
+{
+    var error = result.Steps.FirstOrDefault(s => s.Error is not null)?.Error;
+    if (error is not null)
+    {
+        // Step couldn't execute (HTTP error, network failure, etc.)
+        // error.IsTransient indicates whether retrying could help
+    }
+    else
+    {
+        // Workflow ran to completion but assertions failed
+        // result.AssertionErrors has the details
+    }
+}
+```
+
+When a step fails, the workflow stops immediately — subsequent steps are not executed and assertions are skipped. `ThrowIfFailed()` throws for both execution errors and assertion failures.
 
 `WorkflowResult.ThrowIfFailed()` throws a `JsonWorkflowException` with all assertion errors formatted if `Passed` is `false`.
 - Without `captureAs`, repeated builds of the same step overwrite the individual result capture; the accumulation still grows.

@@ -1,3 +1,5 @@
+using Walkthrough.Core;
+
 namespace Walkthrough.Json;
 
 /// <summary>
@@ -13,6 +15,11 @@ public record WorkflowResult(
 {
     public void ThrowIfFailed()
     {
+        var executionError = Steps.FirstOrDefault(s => s.Error is not null)?.Error;
+        if (executionError is not null)
+            throw new JsonWorkflowException(
+                $"Workflow '{WorkflowName}' failed: {executionError.Message}");
+
         if (!Passed)
             throw new JsonWorkflowException(
                 $"Workflow '{WorkflowName}' failed:\n" +
@@ -23,4 +30,4 @@ public record WorkflowResult(
 /// <summary>
 /// The result of a single step execution.
 /// </summary>
-public record StepResult(string StepName, object? Request, object? Response);
+public record StepResult(string StepName, object? Request, object? Response, StepError? Error = null);

@@ -343,6 +343,169 @@ public class JsonWorkflowRunnerPollTests : IDisposable
     }
 }
 
+// ── Structured execution errors ──────────────────────────────────────────────
+
+public class StructuredExecutionErrorTests : IDisposable
+{
+    private readonly HttpListener _listener;
+    private readonly int _port;
+    private readonly int[] _callCount = new int[1];
+
+    public StructuredExecutionErrorTests()
+    {
+        var tcp = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+        tcp.Start();
+        _port = ((IPEndPoint)tcp.LocalEndpoint).Port;
+        tcp.Stop();
+
+        _listener = new HttpListener();
+        _listener.Prefixes.Add($"http://127.0.0.1:{_port}/");
+        _listener.Start();
+    }
+
+    public void Dispose() => _listener.Stop();
+
+    private void ServeStatus(int statusCode, string body)
+    {
+        _ = Task.Run(async () =>
+        {
+            while (_listener.IsListening)
+            {
+                HttpListenerContext ctx;
+                try { ctx = await _listener.GetContextAsync(); }
+                catch { break; }
+
+                _callCount[0]++;
+                var bytes = System.Text.Encoding.UTF8.GetBytes(body);
+                ctx.Response.StatusCode = statusCode;
+                ctx.Response.ContentType = "application/json";
+                ctx.Response.ContentLength64 = bytes.Length;
+                await ctx.Response.OutputStream.WriteAsync(bytes);
+                ctx.Response.Close();
+            }
+        });
+    }
+
+    private (WorkflowDefinition, Dictionary<string, StepContractDefinition>, List<TargetDefinition>) BuildWorkflow(
+        params StepInvocation[] steps)
+    {
+        var contracts = new Dictionary<string, StepContractDefinition>();
+        var targets = new List<TargetDefinition>
+        {
+            new()
+            {
+                BaseUrl = $"http://127.0.0.1:{_port}",
+                Steps = new()
+                {
+                    ["step1"] = new TargetStepDefinition { Method = "GET", Path = "/step1" },
+                    ["step2"] = new TargetStepDefinition { Method = "GET", Path = "/step2" }
+                }
+            }
+        };
+        var workflow = new WorkflowDefinition(Name: "ErrorTest", Steps: steps.ToList());
+        return (workflow, contracts, targets);
+    }
+
+    [Fact]
+    public async Task NonTransientError_ReturnsFailed_WithErrorOnStep()
+    {
+        ServeStatus(400, "{\"error\":\"bad request\"}");
+
+        var (workflow, contracts, targets) = BuildWorkflow(
+            new StepInvocation { Step = "step1" });
+
+        var result = await JsonWorkflowRunner.RunAsync(workflow, contracts, targets);
+
+        Assert.False(result.Passed);
+        Assert.Single(result.Steps);
+        Assert.NotNull(result.Steps[0].Error);
+        Assert.False(result.Steps[0].Error!.IsTransient);
+        Assert.Contains("400", result.Steps[0].Error!.Message);
+    }
+
+    [Fact]
+    public async Task NonTransientError_StopsWorkflow_SubsequentStepsNotExecuted()
+    {
+        ServeStatus(500, "{\"error\":\"internal\"}");
+
+        var (workflow, contracts, targets) = BuildWorkflow(
+            new StepInvocation { Step = "step1" },
+            new StepInvocation { Step = "step2" });
+
+        var result = await JsonWorkflowRunner.RunAsync(workflow, contracts, targets);
+
+        Assert.False(result.Passed);
+        Assert.Single(result.Steps);
+        Assert.Equal(1, _callCount[0]);
+    }
+
+    [Fact]
+    public async Task NonTransientError_SkipsAssertions()
+    {
+        ServeStatus(400, "{\"error\":\"bad request\"}");
+
+        var (workflow, contracts, targets) = BuildWorkflow(
+            new StepInvocation { Step = "step1" });
+
+        workflow = workflow with
+        {
+            Assertions = [new AssertionDefinition { Equal = ["$step1.status", "ok"] }]
+        };
+
+        var result = await JsonWorkflowRunner.RunAsync(workflow, contracts, targets);
+
+        Assert.False(result.Passed);
+        Assert.Empty(result.AssertionErrors);
+        Assert.NotNull(result.Steps[0].Error);
+    }
+
+    [Fact]
+    public async Task TransientError_StopsWorkflow_WithTransientFlag()
+    {
+        ServeStatus(503, "\"Service Unavailable\"");
+
+        var (workflow, contracts, targets) = BuildWorkflow(
+            new StepInvocation { Step = "step1" },
+            new StepInvocation { Step = "step2" });
+
+        var result = await JsonWorkflowRunner.RunAsync(workflow, contracts, targets);
+
+        Assert.False(result.Passed);
+        Assert.Single(result.Steps);
+        Assert.NotNull(result.Steps[0].Error);
+        Assert.True(result.Steps[0].Error!.IsTransient);
+    }
+
+    [Fact]
+    public async Task ThrowIfFailed_IncludesExecutionError()
+    {
+        ServeStatus(400, "{\"error\":\"bad request\"}");
+
+        var (workflow, contracts, targets) = BuildWorkflow(
+            new StepInvocation { Step = "step1" });
+
+        var result = await JsonWorkflowRunner.RunAsync(workflow, contracts, targets);
+
+        var ex = Assert.Throws<JsonWorkflowException>(() => result.ThrowIfFailed());
+        Assert.Contains("400", ex.Message);
+    }
+
+    [Fact]
+    public async Task SuccessfulStep_HasNoError()
+    {
+        ServeStatus(200, "{\"status\":\"ok\"}");
+
+        var (workflow, contracts, targets) = BuildWorkflow(
+            new StepInvocation { Step = "step1" });
+
+        var result = await JsonWorkflowRunner.RunAsync(workflow, contracts, targets);
+
+        Assert.True(result.Passed);
+        Assert.Single(result.Steps);
+        Assert.Null(result.Steps[0].Error);
+    }
+}
+
 public class CaptureRequestAsTests : IDisposable
 {
     private readonly HttpListener _listener;

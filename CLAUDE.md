@@ -42,7 +42,7 @@ Walkthrough.Json
 ├── JsonWorkflowTestBase           — thin xUnit wrapper over the runner
 ├── WorkflowDefinition             — all JSON model types
 ├── WorkflowResult                 — WorkflowName, Passed, Steps, AssertionErrors, Captures; ThrowIfFailed()
-├── StepResult                     — StepName, Request (resolved payload; null for build steps), Response
+├── StepResult                     — StepName, Request, Response, Error (StepError? — null on success)
 └── JsonValueResolver              — FromJsonValue, JsonElementToObject, field value types
 ```
 
@@ -88,6 +88,7 @@ The published Claude guidance lives in `docs/claude/` and is copied into consumi
 - `docs/claude/claude.md` — consumer entrypoint: library overview and philosophy
 - `docs/claude/csharp-style.md` — fluent C# API patterns (WorkflowRunner, HttpTarget, request/step types, field values)
 - `docs/claude/json-style.md` — JSON workflow and contract patterns, including JsonWorkflowRunner and its result types
+- `docs/claude/upgrade-0.6-to-0.7.md` — migration guide (0.6 → 0.7): structured errors, poll transient retry, HttpExecutor instance
 - `docs/claude/upgrade-0.5-to-0.6.md` — migration guide (0.5 → 0.6): IWorkflowRequest removal, type-name captures
 - `docs/claude/upgrade-0.4-to-0.5.md` — migration guide (0.4 → 0.5)
 - `docs/claude/upgrade-0.3-to-0.4.md` — migration guide (0.3 → 0.4)

@@ -1,6 +1,6 @@
 # C# style
 
-_Current version: 0.7.1. Upgrading from 0.5.x? See [upgrade-0.5-to-0.6.md](upgrade-0.5-to-0.6.md). Upgrading from 0.4.0? See [upgrade-0.4-to-0.5.md](upgrade-0.4-to-0.5.md). Upgrading from 0.3.0? See [upgrade-0.3-to-0.4.md](upgrade-0.3-to-0.4.md)._
+_Current version: 0.7.2. Upgrading from 0.6.x? See [upgrade-0.6-to-0.7.md](upgrade-0.6-to-0.7.md). Upgrading from 0.5.x? See [upgrade-0.5-to-0.6.md](upgrade-0.5-to-0.6.md). Upgrading from 0.4.0? See [upgrade-0.4-to-0.5.md](upgrade-0.4-to-0.5.md). Upgrading from 0.3.0? See [upgrade-0.3-to-0.4.md](upgrade-0.3-to-0.4.md)._
 
 ---
 
@@ -309,7 +309,7 @@ If a custom target wraps `HttpTarget`-style dispatch rather than using a raw `Ht
 
 ```csharp
 var step = /* retrieved HttpStep instance */;
-var result = await ((IHttpStep<TResponse>)step).RunAsync(baseUrl, resolvedFields, targetHeaders);
+var result = await ((IHttpStep<TResponse>)step).RunAsync(executor, resolvedFields, targetHeaders);
 ```
 
 `HttpStep` can only be extended through `HttpStep<TRequest, TResponse, TSelf>` — direct subclassing of `HttpStep` is prevented at compile time. Any registered step is guaranteed to implement `IHttpStep<TResponse>` for its declared response type.
