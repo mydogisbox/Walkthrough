@@ -2,6 +2,8 @@
   <PropertyGroup>
     <Authors>Michael Ciccotti</Authors>
     <Version>0.7.4</Version>
+    <Copyright>Copyright (c) 2026 Michael Ciccotti</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/michaelciccotti/walkthrough</PackageProjectUrl>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <IsPackable>true</IsPackable>
