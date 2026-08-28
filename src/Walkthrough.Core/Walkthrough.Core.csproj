@@ -5,14 +5,14 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
-    <PackageId>MCiccotti.Walkthrough.Core</PackageId>
+    <PackageId>mciccotti.Walkthrough.Core</PackageId>
     <Description>Core types, runner, and field values for Walkthrough workflows.</Description>
   </PropertyGroup>
 
   <ItemGroup>
     <Content Include="build\Walkthrough.Core.targets" Visible="false">
       <Pack>true</Pack>
-      <PackagePath>buildTransitive/MCiccotti.Walkthrough.Core.targets</PackagePath>
+      <PackagePath>buildTransitive/mciccotti.Walkthrough.Core.targets</PackagePath>
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Content>
     <Content Include="..\..\docs\claude\claude.md">

@@ -27,17 +27,17 @@ Every field a test names is a claim that the field matters to that test. Default
 
 | Package | Contents |
 | --- | --- |
-| `MCiccotti.Walkthrough.Core` | Request and response types, `WorkflowRunner`, `WorkflowContext`, field values |
-| `MCiccotti.Walkthrough.Http` | `HttpTarget` and `HttpStep` — sends workflow requests over HTTP |
-| `MCiccotti.Walkthrough.Json` | Run workflows defined in JSON rather than C# |
+| `mciccotti.Walkthrough.Core` | Request and response types, `WorkflowRunner`, `WorkflowContext`, field values |
+| `mciccotti.Walkthrough.Http` | `HttpTarget` and `HttpStep` — sends workflow requests over HTTP |
+| `mciccotti.Walkthrough.Json` | Run workflows defined in JSON rather than C# |
 
 ```bash
-dotnet add package MCiccotti.Walkthrough.Http
+dotnet add package mciccotti.Walkthrough.Http
 ```
 
-`MCiccotti.Walkthrough.Http` depends on `MCiccotti.Walkthrough.Core`; `MCiccotti.Walkthrough.Json` depends on both. All target `net10.0`.
+`mciccotti.Walkthrough.Http` depends on `mciccotti.Walkthrough.Core`; `mciccotti.Walkthrough.Json` depends on both. All target `net10.0`.
 
-Package IDs carry the `MCiccotti.` prefix; the namespaces do not. Install `MCiccotti.Walkthrough.Http`, then `using Walkthrough.Http;`.
+Package IDs carry the `mciccotti.` prefix; the namespaces do not. Install `mciccotti.Walkthrough.Http`, then `using Walkthrough.Http;`.
 
 ## Requests and steps
 
@@ -120,11 +120,11 @@ await BuildAsync(new AddOrderItem() with { ProductName = Static("Deluxe Widget")
 
 ## Workflows in JSON
 
-`MCiccotti.Walkthrough.Json` runs the same workflows from JSON definitions instead of C#, which is useful when the people writing workflows aren't the people compiling them. `JsonWorkflowRunner` executes a definition and returns a `WorkflowResult` carrying per-step requests, responses, assertion failures, and captures.
+`mciccotti.Walkthrough.Json` runs the same workflows from JSON definitions instead of C#, which is useful when the people writing workflows aren't the people compiling them. `JsonWorkflowRunner` executes a definition and returns a `WorkflowResult` carrying per-step requests, responses, assertion failures, and captures.
 
 ## Guidance for coding agents
 
-`MCiccotti.Walkthrough.Core` ships its own usage and style guides inside the package. On build they are written into your project:
+`mciccotti.Walkthrough.Core` ships its own usage and style guides inside the package. On build they are written into your project:
 
 ```
 .claude/walkthrough/
