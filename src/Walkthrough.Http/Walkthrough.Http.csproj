@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
+    <Description>HTTP target and step types for Walkthrough workflows.</Description>
   </PropertyGroup>
 
   <ItemGroup>
