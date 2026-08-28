@@ -4,6 +4,8 @@
     <Version>0.7.4</Version>
     <Copyright>Copyright (c) 2026 Michael Ciccotti</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/mydogisbox/Walkthrough</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
     <PackageProjectUrl>https://github.com/mydogisbox/Walkthrough</PackageProjectUrl>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <IsPackable>true</IsPackable>
