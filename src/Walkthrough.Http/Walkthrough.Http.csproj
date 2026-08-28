@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
+    <PackageId>MCiccotti.Walkthrough.Http</PackageId>
     <Description>HTTP target and step types for Walkthrough workflows.</Description>
   </PropertyGroup>
 

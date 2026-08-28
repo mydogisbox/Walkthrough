@@ -27,15 +27,17 @@ Every field a test names is a claim that the field matters to that test. Default
 
 | Package | Contents |
 | --- | --- |
-| `Walkthrough.Core` | Request and response types, `WorkflowRunner`, `WorkflowContext`, field values |
-| `Walkthrough.Http` | `HttpTarget` and `HttpStep` — sends workflow requests over HTTP |
-| `Walkthrough.Json` | Run workflows defined in JSON rather than C# |
+| `MCiccotti.Walkthrough.Core` | Request and response types, `WorkflowRunner`, `WorkflowContext`, field values |
+| `MCiccotti.Walkthrough.Http` | `HttpTarget` and `HttpStep` — sends workflow requests over HTTP |
+| `MCiccotti.Walkthrough.Json` | Run workflows defined in JSON rather than C# |
 
 ```bash
-dotnet add package Walkthrough.Http
+dotnet add package MCiccotti.Walkthrough.Http
 ```
 
-`Walkthrough.Http` depends on `Walkthrough.Core`; `Walkthrough.Json` depends on both. All target `net10.0`.
+`MCiccotti.Walkthrough.Http` depends on `MCiccotti.Walkthrough.Core`; `MCiccotti.Walkthrough.Json` depends on both. All target `net10.0`.
+
+Package IDs carry the `MCiccotti.` prefix; the namespaces do not. Install `MCiccotti.Walkthrough.Http`, then `using Walkthrough.Http;`.
 
 ## Requests and steps
 
@@ -118,11 +120,11 @@ await BuildAsync(new AddOrderItem() with { ProductName = Static("Deluxe Widget")
 
 ## Workflows in JSON
 
-`Walkthrough.Json` runs the same workflows from JSON definitions instead of C#, which is useful when the people writing workflows aren't the people compiling them. `JsonWorkflowRunner` executes a definition and returns a `WorkflowResult` carrying per-step requests, responses, assertion failures, and captures.
+`MCiccotti.Walkthrough.Json` runs the same workflows from JSON definitions instead of C#, which is useful when the people writing workflows aren't the people compiling them. `JsonWorkflowRunner` executes a definition and returns a `WorkflowResult` carrying per-step requests, responses, assertion failures, and captures.
 
 ## Guidance for coding agents
 
-`Walkthrough.Core` ships its own usage and style guides inside the package. On build they are written into your project:
+`MCiccotti.Walkthrough.Core` ships its own usage and style guides inside the package. On build they are written into your project:
 
 ```
 .claude/walkthrough/
